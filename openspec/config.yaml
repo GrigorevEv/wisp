@@ -1,0 +1,27 @@
+schema: spec-driven
+
+context: |
+  Language: Russian
+  All artifacts must be written in Russian.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Terms come strictly from GLOSSARY.md; no synonyms.
+  Decisions and their reasons live in docs/adr/; specs describe behaviour only.
+
+rules:
+  proposal:
+    - "The first line is `Issue: #<number>` — the GitHub issue this change comes from (docs/agents/issue-tracker.md). If the user gave no issue number, ask for it before writing."
+  tasks:
+    - Spikes and prototypes are the first tasks; each says which tasks it blocks.
+    - Every task is executable by an agent without the user's participation.
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
