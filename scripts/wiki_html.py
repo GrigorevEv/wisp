@@ -10,7 +10,7 @@ html/index.html. Скрипт копирует их и проверяет стр
   create ИМЯ --section S --summary ТЕКСТ --heading ЗАГОЛОВОК ...   новая HTML-страница
   new <путь.md>... [--section S] [--sub S] [--force] [--out ФАЙЛ]   черновик страницы из md
   index [--html-only]                                   данные поиска и дерева → html/index.html
-  sync                                                  wiki-css и wiki-engine из шаблона во все страницы
+  sync                                                  общие блоки страниц и разделитель главной страницы из шаблонов
   links [--edited ИМЯ ...]                               ссылки и даты; у перечисленных страниц источник — HTML
   check [--html-only] [--only ИМЯ] [--render] [--screenshot ФАЙЛ]  проверка страниц
   file <имя заметки | путь.md>...                       адрес страницы: file:///…/html/<файл>.html
@@ -910,13 +910,32 @@ def cmd_new(args):
 
 # ---------------------------------------------------------------- sync / links / index
 
+def sync_index_sidebar(source):
+    template = read(TEMPLATE.with_name("Индекс.html"))
+    for tag, ident, closing in (("style", "wiki-sidebar-css", "</head>"), ("script", "wiki-sidebar", "</body>")):
+        new = block(template, tag, ident)
+        if not new:
+            raise ValueError("в шаблоне главной страницы нет блока %s" % ident)
+        old = block(source, tag, ident)
+        if old:
+            source = source[:old.start()] + new[0] + source[old.end():]
+        else:
+            pos = source.rfind(closing)
+            if pos < 0:
+                raise ValueError("в главной странице нет %s" % closing)
+            source = source[:pos] + new[0] + "\n" + source[pos:]
+    return source
+
+
 def cmd_sync(args):
     css, eng = template_blocks()
     n = 0
     for p in list(all_pages().values()) + ([INDEX] if INDEX.exists() else []):
         s = read(p)
         t = re.sub(r'<style id="wiki-css">.*?</style>', lambda m: css, s, count=1, flags=re.S)
-        if p != INDEX:
+        if p == INDEX:
+            t = sync_index_sidebar(t)
+        else:
             t = re.sub(r'<script id="wiki-engine">.*?</script>', lambda m: eng, t, count=1, flags=re.S)
         t = re.sub(r'<script>(?:try\{)?var t=\(location\.search[^\n]*?</script>', lambda m: THEME_JS, t, count=1)
         t = re.sub(r'\n\s*<button class="tbtn"[^>]*>[^<]*</button>', "", t)
@@ -1571,7 +1590,7 @@ def main():
     a.add_argument("--out", help="записать черновик в этот файл, а не в html/ (для точечного переноса правок)")
     a = sp.add_parser("index", help="данные поиска и дерева → html/index.html")
     a.add_argument("--html-only", action="store_true", help="брать даты из HTML-страниц")
-    sp.add_parser("sync", help="wiki-css и wiki-engine из шаблона во все страницы")
+    sp.add_parser("sync", help="обновить общие блоки страниц и разделитель главной страницы из шаблонов")
     a = sp.add_parser("links", help="ожившие ссылки, адреса для узлов схем, даты")
     a.add_argument("--edited", nargs="+", metavar="ИМЯ", help="имена заметок, отредактированных прямо в HTML")
     a = sp.add_parser("check", help="проверка страниц")

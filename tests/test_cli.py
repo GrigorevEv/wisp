@@ -109,6 +109,25 @@ class CommandTest(WikiCase):
         self.assertIn(index_engine, self.index.read_text())
         self.assertIn("обновлено страниц: 0", self.cli("sync"))
 
+    def test_sync_adds_sidebar_to_existing_index_and_preserves_local_data(self):
+        self.create("Памятка")
+        self.cli("index")
+        source = self.index.read_text().replace("<title>База знаний</title>", "<title>Моя база</title>")
+        blocks = (("style", "wiki-sidebar-css"), ("script", "wiki-sidebar"))
+        for tag, ident in blocks:
+            existing = wiki.block(source, tag, ident)
+            if existing:
+                source = source.replace(existing[0], "")
+        self.index.write_text(source)
+        self.cli("sync")
+        updated = self.index.read_text()
+        for tag, ident in blocks:
+            self.assertIsNotNone(wiki.block(updated, tag, ident), ident)
+        self.assertIn("<title>Моя база</title>", updated)
+        for ident in ("wiki-index", "wiki-sections"):
+            self.assertEqual(wiki.block(source, "script", ident)[0], wiki.block(updated, "script", ident)[0])
+        self.assertIn("обновлено страниц: 0", self.cli("sync"))
+
     def test_links_resolves_exact_title_with_hash_and_keeps_missing_targets(self):
         target = self.create("C#")
         page = self.create("Обзор")

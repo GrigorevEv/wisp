@@ -1,3 +1,6 @@
+import asyncio
+import json
+import os
 import re
 import subprocess
 import tempfile
@@ -10,10 +13,10 @@ from tests.wiki_case import WikiCase
 
 @unittest.skipUnless(wiki.chrome_bin(), "для проверки интерфейса нужен Chrome или Chromium")
 class BrowserTest(WikiCase):
-    def index_dom(self, query):
-        with tempfile.TemporaryDirectory() as profile:
+    def index_dom(self, query, *, profile=None):
+        with tempfile.TemporaryDirectory() as fresh_profile:
             result = subprocess.run([wiki.chrome_bin(), "--headless=new", "--disable-gpu",
-                                     "--disable-background-networking", "--user-data-dir=" + profile,
+                                     "--disable-background-networking", "--user-data-dir=" + str(profile or fresh_profile),
                                      "--dump-dom", self.index.as_uri() + query],
                                     capture_output=True, text=True, timeout=30, check=True)
         self.assertIn('data-ready="1"', result.stdout)
@@ -24,6 +27,91 @@ class BrowserTest(WikiCase):
         match = re.search(r"<aside\b[^>]*>(.*?)</aside>", dom, re.S)
         self.assertIsNotNone(match)
         return match[1]
+
+    def test_sidebar_width_survives_collapse_and_reload(self):
+        observe = """<script>
+const side = document.getElementById("side"), toggle = document.getElementById("toggle");
+const divider = side.querySelector('[role="separator"][aria-orientation="vertical"]');
+if (divider) {
+  const widths = [side.offsetWidth];
+  if (!localStorage.getItem("test-adjusted")) {
+    localStorage.setItem("test-adjusted", "1");
+    divider.focus();
+    document.activeElement.dispatchEvent(new KeyboardEvent("keydown", {key: "ArrowRight", bubbles: true}));
+    widths.push(side.offsetWidth);
+    toggle.click();
+    widths.push(side.offsetWidth, divider.getClientRects().length);
+    toggle.click();
+    widths.push(side.offsetWidth);
+  }
+  document.body.dataset.widths = widths.join(",");
+}
+</script>"""
+        self.index.write_text(self.index.read_text().replace("</body>", observe + "</body>"))
+        profile = self.root / "профиль"
+        first = self.index_dom("", profile=profile)
+        widths = re.search(r'data-widths="([0-9,]+)"', first)
+        self.assertIsNotNone(widths, "нет вертикального разделителя списка")
+        initial, adjusted, collapsed, visible_dividers, reopened = map(int, widths[1].split(","))
+        self.assertEqual(initial, 320)
+        self.assertGreater(adjusted, initial)
+        self.assertEqual((collapsed, visible_dividers, reopened), (46, 0, adjusted))
+        self.assertIn(f'data-widths="{adjusted}"', self.index_dom("", profile=profile))
+
+    @unittest.skipUnless(os.name == "posix", "для канала ввода Chrome нужна POSIX-оболочка")
+    def test_drag_sidebar_over_an_open_note(self):
+        note = self.create("Проверка")
+        self.cli("index")
+
+        async def drag_over_note():
+            # Chrome принимает команды DevTools через дескриптор 3 и отвечает через 4.
+            chrome = await asyncio.create_subprocess_exec(
+                "sh", "-c", 'exec "$@" 3<&0 4>&1 </dev/null >/dev/null', "chrome",
+                wiki.chrome_bin(), "--headless=new", "--disable-gpu", "--remote-debugging-pipe",
+                "--user-data-dir=" + str(self.root / "chrome"), "--window-size=1200,800",
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            session = None
+
+            async def command(method, **params):
+                request = {"id": 1, "method": method, "params": params}
+                if session:
+                    request["sessionId"] = session
+                chrome.stdin.write(json.dumps(request).encode() + b"\0")
+                await chrome.stdin.drain()
+                while True:
+                    packet = await chrome.stdout.readuntil(b"\0")
+                    reply = json.loads(packet[:-1])
+                    if "id" in reply:
+                        self.assertNotIn("error", reply)
+                        return reply["result"]
+
+            async def evaluate(expression):
+                result = await command("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True)
+                self.assertNotIn("exceptionDetails", result)
+                return result["result"].get("value")
+
+            try:
+                target = await command("Target.createTarget", url="about:blank")
+                attached = await command("Target.attachToTarget", targetId=target["targetId"], flatten=True)
+                session = attached["sessionId"]
+                await command("Page.navigate", url=self.index.as_uri() + "#p=" + note.name)
+                await evaluate('document.readyState === "complete" || new Promise(r => window.addEventListener("load", () => r(true)))')
+                width = 'document.getElementById("side").offsetWidth'
+                start = await evaluate(width)
+                self.assertEqual(await evaluate(f"document.elementFromPoint({start + 180}, 150).tagName"), "IFRAME")
+                await command("Input.dispatchMouseEvent", type="mousePressed", x=start, y=150, button="left", buttons=1)
+                for delta in (180, -40):
+                    await command("Input.dispatchMouseEvent", type="mouseMoved", x=start + delta, y=150, button="left", buttons=1)
+                    self.assertEqual(await evaluate(width), start + delta)
+                await command("Input.dispatchMouseEvent", type="mouseReleased", x=start - 40, y=150, button="left", buttons=0)
+                await command("Input.dispatchMouseEvent", type="mouseMoved", x=start + 180, y=150)
+                self.assertEqual(await evaluate(width), start - 40)
+                self.assertEqual(await evaluate(f"document.elementFromPoint({start + 180}, 150).tagName"), "IFRAME")
+            finally:
+                chrome.terminate()
+                await chrome.wait()
+
+        asyncio.run(asyncio.wait_for(drag_over_note(), timeout=30))
 
     def test_known_and_stale_bookmarks(self):
         self.create("Тема")

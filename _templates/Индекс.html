@@ -419,6 +419,18 @@ pre.wg-code .c { color: var(--muted); }
 }
 #note-menu button:is(:hover, :focus-visible) { background: var(--accent-soft); }
 </style>
+<style id="wiki-sidebar-css">
+body.ix-app:not(.collapsed) { grid-template-columns: var(--sidebar-width, 320px) minmax(0, 1fr); }
+.ix-side { position: relative; min-width: 0; }
+.ix-tabs { flex-wrap: wrap; }
+.ix-divider { position: absolute; z-index: 1; inset-block: 0; right: -6px; width: 12px; cursor: col-resize; touch-action: none; }
+.ix-divider::before { content: ""; position: absolute; inset: 0 5px; }
+.ix-divider::after { content: ""; position: absolute; top: 50%; left: 4px; width: 4px; height: 28px; transform: translateY(-50%); border-radius: 2px; background: var(--node-stroke); }
+.ix-divider:focus-visible { outline: none; }
+.ix-divider:hover::before, .ix-divider:focus-visible::before, .ix-resizing .ix-divider::before { border-left: 2px solid var(--accent); }
+.ix-resizing { cursor: col-resize; user-select: none; }
+.ix-resizing .ix-view iframe { pointer-events: none; }
+</style>
 </head>
 <body class="ix-app">
 <aside class="ix-side" id="side">
@@ -765,6 +777,79 @@ search();
 if (p0) openPage(hp.get("p"));
 if (q0) $("q").focus();  /* пришли из поля поиска на странице заметки */
 document.body.setAttribute("data-ready", "1");
+})();
+</script>
+<script id="wiki-sidebar">
+(function () {
+  "use strict";
+  const side = document.getElementById("side");
+  if (!side) return;
+  side.insertAdjacentHTML("beforeend",
+    '<div class="ix-divider" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="side"' +
+    ' aria-label="Ширина списка заметок" title="Потяните границу или используйте стрелки ← и →"></div>');
+  const divider = side.lastElementChild;
+  let preferredWidth = 320;
+  try {
+    const saved = Number(localStorage.getItem("wiki-side-width"));
+    if (Number.isFinite(saved) && saved > 0) preferredWidth = saved;
+  } catch (e) {}
+
+  function showWidth(requested) {
+    const viewport = document.documentElement.clientWidth;
+    const min = Math.min(240, Math.floor(viewport / 2));
+    const max = viewport - Math.min(320, Math.floor(viewport / 3));
+    const width = Math.max(min, Math.min(max, Math.round(requested)));
+    document.body.style.setProperty("--sidebar-width", width + "px");
+    divider.setAttribute("aria-valuemin", min);
+    divider.setAttribute("aria-valuemax", max);
+    divider.setAttribute("aria-valuenow", width);
+    divider.setAttribute("aria-valuetext", width + " пикс.");
+    return width;
+  }
+
+  function commitWidth(start, requested) {
+    const width = showWidth(requested);
+    if (width === start) return;
+    preferredWidth = width;
+    try { localStorage.setItem("wiki-side-width", width); } catch (e) {}
+  }
+
+  let drag = null;
+  divider.addEventListener("pointerdown", function (ev) {
+    if (drag || !ev.isPrimary || ev.button !== 0) return;
+    divider.setPointerCapture(ev.pointerId);
+    drag = { id: ev.pointerId, x: ev.clientX, width: side.offsetWidth };
+    document.body.classList.add("ix-resizing");
+    divider.focus({ preventScroll: true });
+    ev.preventDefault();
+  });
+  divider.addEventListener("pointermove", function (ev) {
+    if (drag && drag.id === ev.pointerId) showWidth(drag.width + ev.clientX - drag.x);
+  });
+  function cancelDrag() {
+    if (!drag) return;
+    if (divider.hasPointerCapture(drag.id)) divider.releasePointerCapture(drag.id);
+    drag = null;
+    document.body.classList.remove("ix-resizing");
+    showWidth(preferredWidth);
+  }
+  function endDrag(ev) {
+    if (!drag || drag.id !== ev.pointerId) return;
+    if (ev.type === "pointerup") commitWidth(drag.width, drag.width + ev.clientX - drag.x);
+    cancelDrag();
+  }
+  divider.addEventListener("pointerup", endDrag);
+  divider.addEventListener("pointercancel", endDrag);
+  divider.addEventListener("lostpointercapture", endDrag);
+  window.addEventListener("blur", cancelDrag);
+  divider.addEventListener("keydown", function (ev) {
+    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+    ev.preventDefault();
+    const width = side.offsetWidth;
+    commitWidth(width, width + (ev.key === "ArrowRight" ? 16 : -16));
+  });
+  window.addEventListener("resize", function () { showWidth(preferredWidth); });
+  showWidth(preferredWidth);
 })();
 </script>
 </body>
