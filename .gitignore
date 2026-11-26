@@ -1,2 +1,8 @@
 # Локальные настройки агентов
 .claude/worktrees/
+
+__pycache__/
+.coverage
+.coverage.*
+# Личные заметки и их полнотекстовый индекс
+/html/

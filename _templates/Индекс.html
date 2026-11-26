@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>База знаний</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231e293b%22/%3E%3Cg transform=%22translate(2.5 2.5) scale(1.125)%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222.1%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z%22/%3E%3C/g%3E%3C/svg%3E">
+<meta name="description" content="Поиск и чтение заметок в локальной базе знаний Wisp.">
+<script>var t=(location.search.match(/[?&]theme=(light|dark)/)||[])[1];if(t)document.documentElement.setAttribute("data-theme",t);if(window.top!==window)document.documentElement.classList.add("in-frame")</script>
+<!-- Разделы и подразделы базы. -->
+<script type="application/json" id="wiki-sections">[{"t":"Хранение данных","subs":[]},{"t":"SCST","subs":[]},{"t":"Железо","subs":[]},{"t":"Linux","subs":["Пакеты"]},{"t":"Разработка","subs":["Git","Тестирование","Безопасность"]},{"t":"Данные и распределённые системы","subs":[]},{"t":"Сеть и веб","subs":[]},{"t":"AI","subs":[]},{"t":"Менеджмент","subs":[]},{"t":"Инструменты","subs":[]},{"t":"Работа","subs":[]},{"t":"Встречи","subs":[]},{"t":"Входящие","subs":[]}]</script>
+<!-- Данные страниц. Перезаписывает `wiki_html.py index`, руками не править. -->
+<script type="application/json" id="wiki-index">[]</script>
+<style id="wiki-css">
+/* ============================================================
+   Стиль базы знаний. Источник — _templates/Заметка.html.
+   Во все страницы html/*.html копирует `wiki_html.py sync`.
+   Цвета только через переменные; тема светлая (?theme=dark — тёмная, только для проверки).
+   Схемы статичные. Интерактив — только виджетом .wg (кнопки, переключатели, статус, подсветка кода);
+   без hover-эффектов, анимации, теней, сворачивания и всплывающих подсказок.
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: light-dark(#f6f6f4, #131416);
+  --surface: light-dark(#ffffff, #1b1c1f);
+  --surface-2: light-dark(#f1f2f4, #232529);
+  --text: light-dark(#1c1d21, #e7e8ea);
+  --muted: light-dark(#5f636b, #a0a3ab);
+  --border: light-dark(#dcdde1, #2f3237);
+  --node-stroke: light-dark(#868b95, #737882);
+  --edge: light-dark(#8a919b, #737a84);
+  --accent: light-dark(#2457d6, #6ea4ff);
+  --accent-soft: light-dark(#e6edfc, #1b2a45);
+  --chg-bg: light-dark(#fff2df, #3a2a13);
+  --chg-stroke: light-dark(#c46f00, #e3a043);
+  --chg-text: light-dark(#8a4d00, #f0bd72);
+  --pause-bg: light-dark(#fde3e1, #3e1e1b);
+  --err: light-dark(#bf3a2b, #e46a5d);
+  --e-data: light-dark(#2563c9, #7aa7ff); --e-tm: light-dark(#8a3fc4, #c39bf0);
+  --e-cfg: light-dark(#0e8a82, #4fc9c0);  --e-sess: light-dark(#5d7f10, #a6c85a);
+  --lane-drv: light-dark(#eef4fd, #151d29);  --lane-drv-t: light-dark(#1f4e99, #9cc0ff);
+  --lane-core: light-dark(#f4f2f9, #1b1924); --lane-core-t: light-dark(#4b3a86, #c3b4f5);
+  --lane-dh: light-dark(#eef7f0, #141f18);   --lane-dh-t: light-dark(#23633a, #95d8aa);
+  --lane-ext: light-dark(#f7f6f2, #1c1b18);  --lane-ext-t: light-dark(#6b5d3a, #d4c08f);
+  --lane-hw: light-dark(#fbf0f6, #2a1824);   --lane-hw-t: light-dark(#8c2f6e, #eba6d6);
+  --dec-bg: light-dark(#e8f6f3, #12221f);    --dec-stroke: light-dark(#2a8a7e, #5cc2b6);
+  --q-bg: light-dark(#fff6dc, #2a2412);      --q-stroke: light-dark(#a7801a, #d8b04a);
+  --thr-c: light-dark(#2f63d1, #6ea4ff);
+  --ext-bg: light-dark(#eceef1, #24272b);
+  --sh-1: light-dark(rgba(0,0,0,.05), rgba(0,0,0,.3));
+  --sh-2: light-dark(rgba(0,0,0,.06), rgba(0,0,0,.25));
+  --shadow: 0 1px 2px var(--sh-1), 0 6px 20px var(--sh-2);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: 70px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); }
+a { color: var(--accent); }
+code { font: 13px var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- Верхняя панель ---------- */
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); }
+.top-in { max-width: 1440px; margin: 0 auto; padding: 8px 20px; display: flex; gap: 8px 22px; align-items: center; flex-wrap: wrap; }
+.top .home { font-weight: 700; color: var(--text); text-decoration: none; white-space: nowrap; }
+.top .home:hover { color: var(--accent); }
+.top .crumbs { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.top .crumbs a { color: var(--muted); text-decoration: none; }
+.top .crumbs a:hover { color: var(--accent); }
+.top nav { display: flex; gap: 4px 16px; flex-wrap: wrap; font-size: 14px; flex: 1 1 auto; }
+.top nav a { text-decoration: none; color: var(--muted); }
+.top nav a:hover { color: var(--accent); }
+
+/* ---------- Страница ---------- */
+.wrap { max-width: 1440px; margin: 0 auto; padding: 20px 20px 80px; }
+h1 { font-size: 26px; line-height: 1.25; margin: 6px 0 8px; }
+.sub { color: var(--muted); max-width: 900px; margin: 0; }
+.sub b, .sub strong { color: var(--text); }
+.intro { max-width: 920px; margin-top: 10px; }
+.intro > :first-child { margin-top: 0; }
+section.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 22px 24px 26px; margin-top: 22px; }
+h2 { font-size: 21px; margin: 0 0 6px; }
+h3 { font-size: 16px; margin: 22px 0 8px; }
+h4 { font-size: 15px; margin: 18px 0 6px; }
+h1 code, h2 code, h3 code, h4 code { font-size: .85em; }
+.lead { max-width: 920px; margin: 0 0 12px; }
+section.card > p, section.card > ul, section.card > ol, section.card > dl, section.card > blockquote,
+.intro > p, .intro > ul, .intro > ol { max-width: 920px; }
+section.card > p:first-of-type { margin-top: 4px; }
+section.card ul, section.card ol, .intro ul, .intro ol { padding-left: 22px; }
+section.card li, .intro li { margin: 2px 0; }
+section.card > ol.steps { max-width: none; padding-left: 0; }
+section.card li > p { margin: 4px 0; }
+blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(--border); color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+
+/* Формула (вместо LaTeX из md): <div class="formula">BM25(<var>D</var>, <var>Q</var>) = <span class="frac"><span>…</span><span>…</span></span></div> */
+.formula { font: 17px/2 "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin: 10px 0 14px; overflow-x: auto; max-width: 920px; }
+.formula var { font-style: italic; }
+.formula .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.5; margin: 0 3px; }
+.formula .frac > span:first-child { border-bottom: 1px solid currentColor; padding: 0 5px 1px; }
+.formula .frac > span:last-child { padding: 1px 5px 0; }
+.formula .big { font-size: 1.5em; vertical-align: -0.12em; }
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; overflow-x: auto; margin: 10px 0 14px; }
+pre code { background: none; padding: 0; border-radius: 0; font: 13px/1.5 var(--mono); }
+
+/* Блок «главное» и выноски */
+.changes, .callout { border: 1px solid var(--chg-stroke); background: var(--chg-bg); border-radius: 10px; padding: 10px 16px; margin: 12px 0 16px; max-width: 920px; }
+.changes b.h { color: var(--chg-text); }
+.changes ul, .callout ul, .callout ol { margin: 6px 0 2px; padding-left: 20px; }
+.callout { border-color: var(--accent); background: var(--accent-soft); }
+.callout > b.h, .callout > p:first-child > b.h:first-child { display: block; color: var(--accent); margin-bottom: 4px; }
+.changes > p { margin: 4px 0; }
+.callout > p { margin: 6px 0; }
+.callout > p:first-of-type { margin-top: 0; }
+.callout.callout-warning, .callout.callout-caution { border-color: var(--chg-stroke); background: var(--chg-bg); }
+.callout.callout-warning b.h, .callout.callout-caution b.h { color: var(--chg-text); }
+.callout.callout-danger, .callout.callout-bug { border-color: var(--err); background: var(--pause-bg); }
+.callout.callout-danger b.h, .callout.callout-bug b.h { color: var(--err); }
+.warn { border-left: 3px solid var(--err); padding: 4px 8px; font-size: 14px; }
+.note { color: var(--muted); font-size: 14px; max-width: 920px; }
+
+/* Ссылки на заметки */
+a.wl { text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+a.wl:hover { border-bottom-color: var(--accent); }
+.wl.planned { color: var(--muted); border-bottom: 1px dashed var(--node-stroke); }
+ul.chips, section.card ul.chips { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+ul.chips li { margin: 0; }
+ul.chips a.wl, ul.chips .wl.planned { display: inline-block; padding: 3px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); font-size: 14px; }
+ul.chips a.wl:hover { border-color: var(--accent); }
+
+/* Плашки meta */
+/* Большая заметка из частей (SCST.html): часть — h2.part-h, её карточки — h3.ch, оглавление — ol.toc */
+.wrap [id] { scroll-margin-top: 64px; }
+.part { margin-top: 56px; }
+.part-h { font-size: 25px; line-height: 1.25; margin: 0 0 8px; padding-top: 18px; border-top: 3px solid var(--border); }
+section.card > h3.ch { font-size: 21px; margin: 0 0 6px; }
+ol.toc { margin: 4px 0 14px; }
+ol.toc li { margin: 4px 0; }
+ol.toc .pill { margin-left: 8px; }
+ol.toc .ix-sum { color: var(--muted); font-size: 14px; margin-left: 8px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 1100px; }
+.pill { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 7px; border-radius: 5px; border: 1px solid; white-space: nowrap; line-height: 20px; }
+.pill.lvl { color: var(--lane-core-t); background: var(--lane-core); border-color: var(--lane-core-t); }
+.pill.ver { color: var(--muted); background: var(--surface-2); border-color: var(--border); font-weight: 500; font-family: var(--mono); font-size: 12px; }
+.pill.st-draft { color: var(--chg-text); background: var(--q-bg); border-color: var(--q-stroke); }
+.pill.st-ok { color: var(--lane-drv-t); background: var(--lane-drv); border-color: var(--lane-drv-t); }
+.pill.st-verified { color: var(--lane-dh-t); background: var(--lane-dh); border-color: var(--lane-dh-t); }
+.pill.term { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+.meta .mi code { font-size: 12px; }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; }
+.foot a { color: var(--muted); }
+
+/* Таблицы */
+.tbl { overflow-x: auto; margin-bottom: 14px; }
+table.tr { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 6px; }
+table.tr th, table.tr td { border: 1px solid var(--border); padding: 8px 10px; vertical-align: top; text-align: left; }
+table.tr th { background: var(--surface-2); }
+/* Узкие таблицы (до двух столбцов) не растягивать на всю карточку */
+table.tr:not(:has(th:nth-child(3), td:nth-child(3))) { width: auto; min-width: min(100%, 520px); max-width: 920px; }
+/* Первый столбец жирный, только если это короткие подписи строк (класс nw ставит конвертер) */
+table.tr.nw td:first-child { font-weight: 600; white-space: nowrap; }
+table.tr tr.grp td { background: var(--surface-2); font-weight: 700; }
+dl.gl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0 0; }
+dl.gl dt { font-weight: 600; }
+dl.gl dd { margin: 0; }
+
+/* Задачи (- [ ]) */
+li.task { list-style: none; margin-left: -20px; }
+.cb { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--node-stroke); border-radius: 3px; margin-right: 8px; vertical-align: -2px; }
+li.task.done .cb { background: var(--accent); border-color: var(--accent); }
+li.task.done { color: var(--muted); }
+
+/* Схема, которую ещё не перерисовали */
+figure.dia-todo { margin: 12px 0; border: 1.5px dashed var(--err); border-radius: 10px; padding: 8px 12px; }
+figure.dia-todo figcaption { color: var(--err); font-size: 13px; font-weight: 600; }
+figure.dia-todo pre { margin: 6px 0 0; max-height: 280px; }
+
+/* ---------- Схема + шаги ---------- */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin: 6px 0 10px; }
+.legend i { display: inline-block; width: 18px; height: 12px; border-radius: 3px; border: 1.5px solid; vertical-align: -1px; margin-right: 6px; }
+.legend i.dia { transform: rotate(45deg) scale(.75); border-radius: 1px; }
+.legend i.dot { width: 11px; height: 11px; border-radius: 50%; border: 0; background: var(--chg-stroke); }
+.legend i.ln { height: 0; border-width: 1.5px 0 0; border-radius: 0; border-color: var(--edge); }
+.legend i.ln.dash { border-top-style: dashed; }
+.legend i.ds { border-style: dashed; }
+
+.split { display: grid; grid-template-columns: minmax(0, auto) minmax(320px, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 1200px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.side { padding: 2px 0; }
+.svg-scroll { overflow-x: auto; }
+svg.dia { display: block; max-width: 100%; height: auto; min-width: 640px; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.stack .steps { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); margin-top: 14px; }
+.steps li.grp { font-size: 13px; font-weight: 700; color: var(--muted); margin: 10px 0 -2px 2px; }
+.steps li.grp:first-child { margin-top: 0; }
+.step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.step .num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font: 700 12px/24px var(--sans); text-align: center; }
+.step h4 { margin: 1px 0 4px; font-size: 15px; }
+.step p { margin: 0 0 6px; }
+.step p:last-child { margin-bottom: 0; }
+.step ul, .step ol { margin: 0 0 6px; padding-left: 18px; }
+.step ul:last-child, .step ol:last-child { margin-bottom: 0; }
+.step li { margin: 1px 0; }
+.step .tag { display: inline-block; font: 600 11px var(--sans); color: var(--chg-text); background: var(--chg-bg); border: 1px solid var(--chg-stroke); border-radius: 5px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.step .tag.hw { color: var(--lane-hw-t); background: var(--lane-hw); border-color: var(--lane-hw-t); }
+.step .proc { color: var(--muted); font-size: 13px; }
+/* Номер шага в тексте и таблицах — тот же значок, что на схеме */
+.ref { display: inline-block; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--accent); color: #fff; font: 700 11px/20px var(--sans); text-align: center; vertical-align: 1px; }
+.ref.hw { background: var(--lane-hw-t); color: light-dark(#fff, #2a1824); }
+/* Варианты одной схемы — друг под другом */
+figure.dia-var { margin: 16px 0 0; }
+figure.dia-var + figure.dia-var { border-top: 1px solid var(--border); padding-top: 14px; }
+figure.dia-var > figcaption { font-weight: 700; margin: 0 0 4px; }
+figure.dia-var > .note { margin: 0 0 8px; }
+
+/* ---------- SVG ---------- */
+.dia text { font-family: var(--sans); fill: var(--text); }
+.dia .t { font-size: 13.5px; font-weight: 600; }
+.dia .s { font-size: 11.5px; fill: var(--muted); }
+.dia .lt { font-size: 12.5px; font-weight: 700; }
+.dia .ls { font-size: 11.5px; fill: var(--muted); }
+.dia .el { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+.dia .el.dash { stroke-dasharray: 6 4; }
+.dia .el.err { stroke: var(--err); }
+.dia .el.chg { stroke: var(--chg-stroke); }
+.dia .el.hw { stroke: var(--lane-hw-t); }
+.dia .el.data { stroke: var(--e-data); } .dia .el.tm { stroke: var(--e-tm); } .dia .el.cfg { stroke: var(--e-cfg); } .dia .el.sess { stroke: var(--e-sess); }
+.dia .lab { font-size: 11.5px; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.dia .lab.err { fill: var(--err); }
+.dia .lab.chg { fill: var(--chg-text); }
+.dia .lab.hw { fill: var(--lane-hw-t); }
+.dia .lab.data { fill: var(--e-data); } .dia .lab.tm { fill: var(--e-tm); } .dia .lab.cfg { fill: var(--e-cfg); } .dia .lab.sess { fill: var(--e-sess); }
+.dia .shape { stroke-width: 1.5; }
+.dia .k-drv .shape { fill: var(--lane-drv); stroke: var(--lane-drv-t); }
+.dia .k-core .shape { fill: var(--lane-core); stroke: var(--lane-core-t); }
+.dia .k-disk .shape { fill: var(--lane-dh); stroke: var(--lane-dh-t); }
+.dia .k-hw .shape { fill: var(--lane-hw); stroke: var(--lane-hw-t); }
+.dia .k-pause .shape { fill: var(--q-bg); stroke: var(--q-stroke); stroke-dasharray: 6 4; }
+.dia .k-err .shape { fill: var(--pause-bg); stroke: var(--err); }
+.dia .k-dec .shape { fill: var(--dec-bg); stroke: var(--dec-stroke); }
+.dia .k-dec .t { font-size: 13px; }
+.dia .k-note .shape { fill: var(--surface-2); stroke: var(--muted); stroke-dasharray: 5 4; }
+.dia .k-thr .shape { fill: var(--surface); stroke: var(--thr-c); }
+.dia .k-q .shape { fill: var(--q-bg); stroke: var(--q-stroke); }
+.dia .k-ext .shape { fill: var(--ext-bg); stroke: var(--node-stroke); }
+.dia .k-ghost .shape { fill: none; stroke: var(--node-stroke); stroke-dasharray: 5 4; }
+.dia .k-ghost text { fill: var(--muted); }
+.dia .k-focus .shape { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+.dia .k-init .shape { fill: var(--text); stroke: none; }
+.dia .k-final .shape { fill: none; stroke: var(--text); stroke-width: 2; }
+.dia .k-final .core { fill: var(--text); }
+/* Значки СМО: узлы с полем q */
+.dia .qi .shape { stroke-width: 1.6; }
+.dia .qi .qsh { fill: none; opacity: .6; }
+.dia .qi.k-note .shape { stroke-dasharray: none; }
+.dia .qi .gl { fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.dia .qi .glf { stroke: none; }
+.dia .qi .qt { font-size: 12.5px; font-weight: 600; }
+.dia .own rect { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+.dia .own .ot { font-size: 10.5px; font-weight: 600; fill: var(--muted); }
+.dia .own.all rect { fill: var(--text); stroke: var(--text); }
+.dia .own.all .ot { fill: var(--surface); }
+.dia .k-hw .gl { stroke: var(--lane-hw-t); } .dia .k-hw .glf { fill: var(--lane-hw-t); }
+.dia .k-q .gl { stroke: var(--q-stroke); } .dia .k-q .glf { fill: var(--q-stroke); }
+.dia .k-thr .gl { stroke: var(--thr-c); } .dia .k-thr .glf { fill: var(--thr-c); }
+.dia .k-err .gl { stroke: var(--err); } .dia .k-err .glf { fill: var(--err); }
+.dia .k-dec .gl { stroke: var(--dec-stroke); } .dia .k-dec .glf { fill: var(--dec-stroke); }
+.dia .k-disk .gl { stroke: var(--lane-dh-t); } .dia .k-disk .glf { fill: var(--lane-dh-t); }
+.dia .k-note .gl { stroke: var(--muted); } .dia .k-note .glf { fill: var(--muted); }
+.dia .k-core .gl { stroke: var(--lane-core-t); } .dia .k-core .glf { fill: var(--lane-core-t); }
+.dia .k-drv .gl { stroke: var(--lane-drv-t); } .dia .k-drv .glf { fill: var(--lane-drv-t); }
+.dia .k-ext .gl { stroke: var(--node-stroke); } .dia .k-ext .glf { fill: var(--node-stroke); }
+/* Окно описания узла: поле tip, по клику */
+.dia .nd.tip { cursor: pointer; }
+.ndpop { position: absolute; z-index: 20; width: max-content; max-width: min(440px, calc(100vw - 16px)); padding: 10px 14px; background: var(--surface); color: var(--text); border: 1px solid var(--node-stroke); border-radius: 10px; font-size: 14px; line-height: 1.5; }
+.dia a.lnk .t { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 3px; }
+.dia .badge circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.dia .badge text { fill: #fff; font-size: 11px; font-weight: 700; }
+.dia .badge.hw circle { fill: var(--lane-hw-t); }
+.dia .badge.hw text { fill: light-dark(#fff, #2a1824); }
+.dia .chgdot { fill: var(--chg-stroke); stroke: var(--surface); stroke-width: 2; }
+.dia .lane-ext { fill: var(--lane-ext); } .dia .lane-t-ext { fill: var(--lane-ext-t); }
+.dia .lane-drv { fill: var(--lane-drv); } .dia .lane-t-drv { fill: var(--lane-drv-t); }
+.dia .lane-core { fill: var(--lane-core); } .dia .lane-t-core { fill: var(--lane-core-t); }
+.dia .lane-dh { fill: var(--lane-dh); } .dia .lane-t-dh { fill: var(--lane-dh-t); }
+.dia .lane-hw { fill: var(--lane-hw); } .dia .lane-t-hw { fill: var(--lane-hw-t); }
+.dia .lane-svc { fill: var(--surface-2); } .dia .lane-t-svc { fill: var(--muted); }
+/* seq */
+.dia .life { stroke: var(--node-stroke); stroke-width: 1; stroke-dasharray: 3 5; }
+.dia .blk { stroke: none; }
+.dia .blk-hw { fill: var(--lane-hw); }
+.dia .blk-grp { fill: var(--surface-2); }
+.dia .blk-err { fill: var(--pause-bg); }
+.dia .blk-alt { fill: none; stroke: var(--node-stroke); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.dia .blt { font-size: 11px; font-weight: 700; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.dia .blt-hw { fill: var(--lane-hw-t); }
+.dia .blt-err { fill: var(--err); }
+.dia .sepl { stroke: var(--border); stroke-width: 3; }
+.dia .sepb { fill: var(--surface-2); stroke: var(--node-stroke); stroke-width: 1; }
+.dia .sept { font-size: 12px; font-weight: 700; }
+.dia .gapt { font-size: 11.5px; font-style: italic; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+.dia .xm { stroke: var(--err); stroke-width: 2.2; }
+
+/* ---------- index.html: список заметок слева, окно просмотра справа ---------- */
+.ix-search { flex: 1 1 360px; max-width: 640px; position: relative; }
+.ix-search input { width: 100%; font: 15px var(--sans); padding: 7px 12px 7px 34px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); outline: none; }
+.ix-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ix-search::before { content: "⌕"; position: absolute; left: 11px; top: 5px; font-size: 17px; color: var(--muted); }
+.ix-search kbd { position: absolute; right: 9px; top: 7px; }
+form.ix-search { margin: 0; }
+.top .ix-search.pg { flex: 0 1 300px; }
+kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; color: var(--muted); background: var(--surface-2); }
+mark { background: color-mix(in srgb, var(--chg-stroke) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.in-frame .top { display: none; }
+html.in-frame { scroll-padding-top: 12px; }
+.in-frame .wrap [id] { scroll-margin-top: 12px; }
+body.ix-app { margin: 0; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+body.ix-app.collapsed { grid-template-columns: 46px minmax(0, 1fr); }
+.ix-side { display: flex; flex-direction: column; min-height: 0; background: var(--surface-2); border-right: 1px solid var(--border); }
+.ix-side-top { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 16px; }
+.ix-side-top .home { font-weight: 700; color: var(--text); text-decoration: none; flex: 1; white-space: nowrap; }
+.ix-btn { font: 15px/1 var(--sans); color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px 8px; cursor: pointer; }
+.ix-btn:hover { color: var(--text); border-color: var(--border); background: var(--surface); }
+.collapsed .ix-side-top { padding: 10px 6px; justify-content: center; }
+.collapsed .ix-side-top .home, .collapsed .ix-side-top .ix-tabs, .collapsed .ix-side > :not(.ix-side-top) { display: none; }
+.ix-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; margin-left: -8px; }
+.ix-tab { font: 600 14px/1.2 var(--sans); color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 5px 8px 4px; cursor: pointer; white-space: nowrap; }
+.ix-tab:hover { color: var(--text); }
+.ix-tab.on { color: var(--text); font-weight: 700; border-bottom-color: var(--accent); }
+.ix-empty .ix-tab { padding: 0; font-weight: 400; font-size: inherit; color: var(--accent); border: 0; text-decoration: underline; }
+.ix-side .ix-search { flex: none; max-width: none; margin: 0 10px 6px; }
+.ix-side .ix-search input { font-size: 14px; padding: 6px 10px 6px 30px; }
+.ix-side .ix-search::before { left: 10px; top: 4px; }
+.ix-side .ix-search kbd { top: 6px; }
+.ix-count { color: var(--muted); font-size: 12px; padding: 0 18px 4px; }
+.ix-list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 2px 6px 18px; }
+.ix-list a.ix-t { display: block; padding: 3px 10px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.ix-list a.ix-t:hover { background: var(--surface); }
+.ix-list a.ix-t.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ix-list li.res { margin: 0 0 6px; }
+.ix-list .ix-snip { color: var(--muted); font-size: 12.5px; line-height: 1.4; padding: 0 10px; }
+.ix-list .ix-hd { list-style: none; margin: 1px 0 0; padding: 0 10px; font-size: 12.5px; }
+.ix-list .ix-hd a { text-decoration: none; }
+.ix-empty { color: var(--muted); font-size: 13.5px; padding: 6px 10px; }
+.ix-view { position: relative; min-width: 0; min-height: 0; background: var(--bg); }
+.ix-view iframe { display: block; width: 100%; height: 100%; border: 0; }
+.ix-home { position: absolute; inset: 0; overflow-y: auto; }
+.ix-home .wrap { max-width: 900px; }
+.ix-recent { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; font-size: 14px; }
+.ix-recent .d { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px; }
+/* ---------- Виджет: модель, которую можно пощёлкать ----------
+   <div class="wg" id="wg-…" role="group" aria-label="…">: подписи .wg-lab, ряды ячеек .wg-cells > .wg-cell,
+   стрелка-связь между ячейками span.arr, дерево .wg-tree > div (уровень) > span (место узла, пустое — нет узла),
+   столбцы .wg-cols > .wg-col, кнопки и переключатели в .wg-row, пояснение шага в .wg-status (aria-live).
+   Код под виджетом — pre.wg-code, функции в span.fn[data-fn]; выполненная функция получает .hit.
+   Логика — в скрипте сразу после блока, в своей странице. Без hover, анимации и теней. */
+.wg { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin: 12px 0 10px; display: grid; gap: 12px; max-width: 920px; }
+.wg-lab { font: 600 12.5px var(--mono); color: var(--muted); margin-bottom: -6px; }
+.wg-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; font-size: 14px; }
+.wg-row .sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+.wg-row .opt { color: var(--muted); }
+.wg button { font: 600 14px/1.2 var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--node-stroke); border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+.wg button.main { background: var(--accent); border-color: var(--accent); color: light-dark(#fff, #10131a); }
+.wg button.danger { color: var(--err); border-color: var(--err); }
+.wg button.sq { min-width: 34px; padding: 6px 0; font-family: var(--mono); }
+.wg button:focus-visible, .wg input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wg label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+.wg input[type="number"] { width: 72px; font: 14px var(--mono); padding: 5px 8px; border: 1px solid var(--node-stroke); border-radius: 7px; background: var(--surface); color: var(--text); }
+.wg output, .wg .val { font: 700 15px var(--mono); min-width: 2.2em; text-align: center; display: inline-block; }
+.wg-status { background: var(--surface-2); border-radius: 7px; padding: 8px 12px; min-height: 3.1em; font-size: 14.5px; }
+.wg-status.bad { background: var(--pause-bg); color: var(--err); }
+.wg-status.good { background: var(--lane-dh); color: var(--lane-dh-t); }
+.wg-status code { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.wg-cells { display: flex; flex-wrap: wrap; gap: 4px; }
+.wg-cells .gap { width: 12px; }
+.wg-cell { min-width: 54px; flex: 0 0 auto; text-align: center; font: 600 14px/1.25 var(--mono); border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; background: var(--surface); }
+.wg-cell small { display: block; font: 400 11px/1.3 var(--mono); color: var(--muted); }
+.wg-cell.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.wg-cell.hit { background: var(--chg-bg); border-color: var(--chg-stroke); color: var(--chg-text); }
+.wg-cell.bad { background: var(--pause-bg); border-color: var(--err); color: var(--err); }
+.wg-cell.ok { background: var(--lane-dh); border-color: var(--lane-dh-t); color: var(--lane-dh-t); }
+.wg-cell.other { border-style: dashed; color: var(--muted); background: var(--surface-2); }
+.wg-cell.on small, .wg-cell.hit small, .wg-cell.bad small, .wg-cell.ok small { color: inherit; }
+.wg-cells .arr { align-self: center; font: 14px var(--mono); color: var(--muted); padding: 0 2px; }
+.wg-tree { display: grid; gap: 8px; }
+.wg-tree > div { display: flex; }
+.wg-tree > div > span { flex: 1 1 0; min-width: 0; display: flex; justify-content: center; }
+.wg-cols { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.wg-col { display: grid; gap: 4px; align-content: start; }
+.wg-col > b { font-size: 13px; text-align: center; }
+.wg-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.wg-legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -2px; margin-right: 5px; }
+.wg-legend i.on { background: var(--accent-soft); border-color: var(--accent); }
+.wg-legend i.hit { background: var(--chg-bg); border-color: var(--chg-stroke); }
+.wg-legend i.bad { background: var(--pause-bg); border-color: var(--err); }
+.wg-legend i.ok { background: var(--lane-dh); border-color: var(--lane-dh-t); }
+.wg-legend i.other { background: var(--surface-2); border-style: dashed; }
+pre.wg-code { max-width: 920px; font: 13px/1.5 var(--mono); }
+pre.wg-code .fn { display: block; margin: 0 -8px; padding: 0 8px; border-radius: 4px; }
+pre.wg-code .fn.hit { background: var(--accent-soft); }
+pre.wg-code .c { color: var(--muted); }
+</style>
+<style>
+#note-menu {
+  position: fixed; inset: auto; margin: 0; padding: 4px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text); box-shadow: 0 4px 14px #0002;
+}
+#note-menu button {
+  display: block; width: 100%; text-align: left;
+  padding: 6px 12px; border: 0; border-radius: 4px; background: transparent;
+  color: inherit; font: inherit; cursor: pointer;
+}
+#note-menu button:is(:hover, :focus-visible) { background: var(--accent-soft); }
+</style>
+</head>
+<body class="ix-app">
+<aside class="ix-side" id="side">
+  <div class="ix-side-top">
+    <nav class="ix-tabs" id="tabs" aria-label="Вкладки">
+      <button class="ix-tab on" type="button" data-tab="all">База знаний</button>
+      <button class="ix-tab" type="button" data-tab="work">Работа</button>
+      <button class="ix-tab" type="button" data-tab="lectures">Встречи</button>
+    </nav>
+    <button class="ix-btn" id="toggle" type="button" aria-label="Свернуть список" aria-expanded="true">«</button>
+  </div>
+  <label class="ix-search"><input id="q" type="search" placeholder="Поиск: термин, алиас, текст…" autocomplete="off" spellcheck="false" aria-label="Поиск"><kbd>/</kbd></label>
+  <div class="ix-count" id="stats"></div>
+  <ul class="ix-list" id="list"></ul>
+  <button id="delete-note" type="button" hidden>Удалить заметку</button>
+</aside>
+<div id="note-menu" popover>
+  <button id="menu-rename" type="button">Переименовать</button>
+  <button id="menu-delete" type="button">Удалить заметку</button>
+</div>
+
+<main class="ix-view">
+  <iframe id="view" name="view" title="Заметка" hidden></iframe>
+  <div class="ix-home" id="home">
+    <div class="wrap">
+      <h1>База знаний</h1>
+      <p class="sub" id="home-stats"></p>
+      <section class="card"><h2>Как пользоваться</h2>
+        <ul>
+          <li>Слева — заметки по алфавиту. Заметка открывается здесь, справа.</li>
+          <li>Вкладки над списком: <b>База знаний</b> — общие заметки, <b>Работа</b> — практика по рабочим задачам, <b>Встречи</b> — заметки встреч из Spook, от новых к старым. Поиск ищет внутри открытой вкладки.</li>
+          <li>Поиск — поле над списком, клавиши <kbd>/</kbd> или <kbd>Ctrl</kbd> <kbd>K</kbd>. Ищутся все слова сразу, по началу слова; регистр и ё/е не важны. <kbd>Enter</kbd> открывает первую найденную заметку, <kbd>Esc</kbd> очищает поле.</li>
+          <li>Кнопка <b>«</b> над списком сворачивает его, <b>»</b> — разворачивает.</li>
+        </ul>
+      </section>
+      <section class="card"><h2>Недавно обновлённые</h2><ul class="ix-recent" id="recent"></ul></section>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+"use strict";
+function $(id) { return document.getElementById(id); }
+var PAGES = JSON.parse($("wiki-index").textContent);
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+function norm(s) { return String(s || "").toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }
+function words(s) { var n = norm(s); return n ? n.split(" ") : []; }
+function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+function url(p, id) { return p.file.replace(/%/g, "%25").replace(/ /g, "%20").replace(/#/g, "%23").replace(/\?/g, "%3F") + (id ? "#" + encodeURIComponent(id) : ""); }
+/* Как в Obsidian: цифры, латиница, затем кириллица. */
+function cmpTitle(a, b) { return a.title.localeCompare(b.title, "en", { sensitivity: "base", numeric: true }); }
+function plural(n, a, b, c) { var m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; }
+function item(p, inner) { return '<a class="ix-t" href="' + url(p) + '" target="view" data-file="' + esc(p.file) + '">' + (inner || esc(p.title)) + "</a>"; }
+
+/* ---------- Подготовка данных для поиска ---------- */
+PAGES.forEach(function (p) {
+  p._t = words(p.title);
+  p._a = p.aliases.map(words);
+  p._h = p.heads.map(function (h) { return words(h.t); });
+  p._g = [].concat.apply([], p.tags.map(words));
+  p._s = words(p.summary);
+  var seen = {}; p._x = words(p.text).filter(function (w) { return seen[w] ? false : (seen[w] = 1); });
+});
+
+/* ---------- Поиск ---------- */
+var W8 = { t: 100, a: 60, h: 30, g: 20, s: 10, x: 4 };
+function pre(list, q) { for (var i = 0; i < list.length; i++) if (list[i].lastIndexOf(q, 0) === 0) return list[i] === q ? 2 : 1; return 0; }
+function preAny(lists, q) { var b = 0; for (var i = 0; i < lists.length; i++) { b = Math.max(b, pre(lists[i], q)); if (b === 2) break; } return b; }
+function score(p, qs) {
+  var total = 0, by = {};
+  for (var i = 0; i < qs.length; i++) {
+    var q = qs[i], best = 0, f = "", m;
+    if ((m = pre(p._t, q))) { best = W8.t * (m === 2 ? 1.5 : 1); f = "t"; }
+    if (!best && (m = preAny(p._a, q))) { best = W8.a * (m === 2 ? 1.5 : 1); f = "a"; }
+    if (!best && (m = preAny(p._h, q))) { best = W8.h; f = "h"; }
+    if (!best && (m = pre(p._g, q))) { best = W8.g; f = "g"; }
+    if (!best && (m = pre(p._s, q))) { best = W8.s; f = "s"; }
+    if (!best && (m = pre(p._x, q))) { best = W8.x; f = "x"; }
+    if (!best) return null;
+    total += best; by[f] = 1;
+  }
+  if (norm(p.title).lastIndexOf(qs.join(" "), 0) === 0) total += 50;
+  return { s: total, by: by };
+}
+function markRe(qs) { return new RegExp("(^|[^\\p{L}\\p{N}])(" + qs.map(reEsc).join("|") + ")[\\p{L}\\p{N}]*", "gu"); }
+function marks(orig, qs) {
+  var low = orig.toLowerCase().replace(/ё/g, "е");
+  if (low.length !== orig.length) return esc(orig);
+  var re = markRe(qs), out = "", last = 0, m;
+  while ((m = re.exec(low))) {
+    var s = m.index + m[1].length, e = m.index + m[0].length;
+    out += esc(orig.slice(last, s)) + "<mark>" + esc(orig.slice(s, e)) + "</mark>";
+    last = e;
+    if (!m[0].length) re.lastIndex++;
+  }
+  return out + esc(orig.slice(last));
+}
+function snippet(p, qs) {
+  var src = p.text || p.summary, low = src.toLowerCase().replace(/ё/g, "е"), m = markRe(qs).exec(low);
+  if (!m) return marks(p.summary.slice(0, 220), qs);
+  var i = m.index + m[1].length, a = Math.max(0, i - 80), b = Math.min(src.length, i + 170);
+  if (a > 0) { var sp = src.indexOf(" ", a); if (sp >= 0 && sp < i) a = sp + 1; }
+  var cut = src.slice(a, b).replace(/\s*\n\s*/g, " · ");
+  return (a > 0 ? "… " : "") + marks(cut, qs) + (b < src.length ? " …" : "");
+}
+
+/* ---------- Список слева: все заметки по алфавиту или результаты поиска ---------- */
+PAGES.sort(cmpTitle);
+var current = "", first = null;
+
+/* ---------- Вкладки: «Работа» — раздел «Работа», «Встречи» — раздел «Встречи» (папка lectures/, заметки из Spook),
+   «База знаний» — все остальные. Во вкладке «Встречи» заметки идут от новых к старым: имя начинается
+   с даты и времени начала «ГГГГ-ММ-ДД ЧЧ-ММ», поэтому обратный порядок имён и есть обратный порядок времени. ---------- */
+var TABS = { all: "База знаний", work: "Работа", lectures: "Встречи" }, tab = "all";
+var TAB_OF_SECTION = { "Работа": "work", "Встречи": "lectures" };
+function tabOf(p) { return (p && TAB_OF_SECTION[p.section]) || "all"; }
+function inTab(p) { return tabOf(p) === tab; }
+function cmpInTab(a, b) { return tab === "lectures" ? cmpTitle(b, a) : cmpTitle(a, b); }
+function otherTabs(counts) {  /* [[ключ вкладки, сколько нашлось], …] для вкладок, кроме открытой */
+  return Object.keys(TABS).filter(function (t) { return t !== tab && counts[t]; }).map(function (t) { return [t, counts[t]]; });
+}
+function pageByFile(file) { for (var i = 0; i < PAGES.length; i++) if (PAGES[i].file === file) return PAGES[i]; return null; }
+function setTab(t) {
+  tab = TABS[t] ? t : "all";
+  [].forEach.call($("tabs").querySelectorAll("[data-tab]"), function (b) {
+    var on = b.getAttribute("data-tab") === tab;
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+  });
+  try { localStorage.setItem("wiki-tab", tab); } catch (e) {}
+}
+function switchTab(t) { if (t !== tab) { setTab(t); search(); } }
+$("tabs").addEventListener("click", function (ev) { var b = ev.target.closest("[data-tab]"); if (b) switchTab(b.getAttribute("data-tab")); });
+function markCurrent() {
+  var on = $("list").querySelector("a.ix-t.on");
+  if (on) on.classList.remove("on");
+  var a = current && $("list").querySelector('a.ix-t[data-file="' + CSS.escape(current) + '"]');
+  if (a) { a.classList.add("on"); if (!$("q").value) a.scrollIntoView({ block: "nearest" }); }
+}
+function renderAll() {
+  var ps = PAGES.filter(inTab).sort(cmpInTab);
+  $("list").innerHTML = ps.length ? ps.map(function (p) { return "<li>" + item(p) + "</li>"; }).join("")
+    : '<li class="ix-empty">Во вкладке пока нет заметок.</li>';
+  $("stats").textContent = ps.length + " " + plural(ps.length, "заметка", "заметки", "заметок");
+  first = $("list").querySelector("a.ix-t");
+  markCurrent();
+}
+function search() {
+  closeNoteMenu();
+  var raw = $("q").value, qs = words(raw);
+  if (!qs.length) { renderAll(); first = null; saveHash(); return; }
+  var res = [], counts = {};
+  PAGES.forEach(function (p) { var sc = score(p, qs); if (sc) { if (inTab(p)) res.push([sc, p]); else counts[tabOf(p)] = (counts[tabOf(p)] || 0) + 1; } });
+  var others = otherTabs(counts);
+  res.sort(function (x, y) { return y[0].s - x[0].s || cmpInTab(x[1], y[1]); });
+  $("stats").textContent = "Найдено: " + res.length + others.map(function (o) { return " · во вкладке «" + TABS[o[0]] + "» ещё " + o[1]; }).join("");
+  $("list").innerHTML = res.length ? res.slice(0, 80).map(function (r) {
+    var p = r[1];
+    var heads = p.heads.filter(function (hd, i) { return qs.every(function (q) { return pre(p._h[i], q); }); }).slice(0, 6);
+    return '<li class="res">' + item(p, marks(p.title, qs)) + '<div class="ix-snip">' + snippet(p, qs) + "</div>" +
+      (heads.length ? '<ul class="ix-hd">' + heads.map(function (hd) {
+        return '<li>§ <a href="' + url(p, hd.id) + '" target="view">' + marks(hd.t, qs) + "</a></li>"; }).join("") + "</ul>" : "") + "</li>";
+  }).join("") : others.length ? '<li class="ix-empty">В этой вкладке ничего не нашлось. ' + others.map(function (o) {
+      return '<button class="ix-tab" type="button" data-tab="' + o[0] + '">Во вкладке «' + TABS[o[0]] + "» — " + o[1] + "</button>"; }).join(" ") + "</li>"
+    : '<li class="ix-empty">Ничего не нашлось. Попробуйте начало слова или другое написание.</li>';
+  first = $("list").querySelector("a.ix-t");
+  markCurrent();
+  saveHash();
+}
+
+/* ---------- Окно просмотра ---------- */
+/* Адрес главной: #p=<файл страницы с якорем> — открытая заметка; #q=<запрос> — поиск. */
+var view = $("view"), shown = "";
+function saveHash() {
+  var h = [];
+  if (tab !== "all") h.push("t=" + tab);
+  if (shown) h.push("p=" + encodeURIComponent(shown));
+  if ($("q").value) h.push("q=" + encodeURIComponent($("q").value));
+  try { history.replaceState(null, "", location.pathname + (h.length ? "#" + h.join("&") : "")); } catch (e) {}
+}
+function showPage(file) {          /* file — как в адресе: имя-файла.html#якорь */
+  var pg = pageByFile(file.split("#")[0]);
+  if (!pg) return;
+  shown = file;
+  current = pg.file;
+  $("delete-note").hidden = false;
+  if (!$("q").value) switchTab(tabOf(pg));
+  $("home").hidden = true; view.hidden = false;
+  document.title = pg.title + " — База знаний";
+  markCurrent();
+  saveHash();
+}
+function openPage(file) {
+  if (!pageByFile(file.split("#")[0])) return;
+  view.contentWindow.location.replace(new URL(file, location.href).href);
+  showPage(file);
+}
+$("list").addEventListener("click", function (ev) {
+  var b = ev.target.closest("[data-tab]");
+  if (b) { switchTab(b.getAttribute("data-tab")); return; }
+  var a = ev.target.closest("a[target=view]");
+  if (a && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && ev.button === 0) { ev.preventDefault(); openPage(a.getAttribute("href")); }
+});
+var noteMenu = $("note-menu");
+
+function showNoteMenu(ev) {
+  var row = ev.target.closest("#list > li, #recent > li");
+  var link = row && row.querySelector("a[data-file]");
+  if (!link || !noteMenu.showPopover || $("delete-note").disabled) return;
+  ev.preventDefault();
+  noteMenu.dataset.file = link.dataset.file;
+  noteMenu.showPopover();
+  noteMenu.style.left = Math.max(0, Math.min(ev.clientX, innerWidth - noteMenu.offsetWidth)) + "px";
+  noteMenu.style.top = Math.max(0, Math.min(ev.clientY, innerHeight - noteMenu.offsetHeight)) + "px";
+  $("menu-rename").focus({ preventScroll: true });
+}
+$("list").addEventListener("contextmenu", showNoteMenu);
+$("recent").addEventListener("contextmenu", showNoteMenu);
+function closeNoteMenu() {
+  if (noteMenu.hidePopover) noteMenu.hidePopover();
+}
+$("list").addEventListener("scroll", closeNoteMenu);
+window.addEventListener("blur", closeNoteMenu);
+window.addEventListener("resize", closeNoteMenu);
+$("menu-rename").addEventListener("click", async function () {
+  var page = pageByFile(noteMenu.dataset.file);
+  closeNoteMenu();
+  if (!page || $("delete-note").disabled) return;
+  if (location.protocol !== "http:" || location.hostname !== "127.0.0.1") {
+    alert("Для переименования откройте Wisp на локальном сервере.");
+    return;
+  }
+  var title = prompt("Новое название заметки", page.title);
+  if (title === null || title.trim() === page.title) return;
+  if (!title.trim()) {
+    alert("Введите название заметки.");
+    return;
+  }
+  $("delete-note").disabled = true;
+  try {
+    var response = await fetch("/notes/" + encodeURIComponent(page.file), {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim() })
+    });
+    if (response.status === 409 || response.status === 400) {
+      alert(response.status === 409 ? "Это название уже занято." : "Проверьте название заметки.");
+      return;
+    }
+    if (!response.ok) throw new Error();
+    var result = await response.json();
+    if (current === page.file) shown = result.file + shown.slice(shown.split("#")[0].length);
+    saveHash();
+    location.reload();
+  } catch (err) {
+    alert("Не удалось переименовать заметку. Проверьте соединение с Wisp.");
+  } finally {
+    $("delete-note").disabled = false;
+  }
+});
+$("menu-delete").addEventListener("click", function () {
+  closeNoteMenu();
+  deleteNote(pageByFile(noteMenu.dataset.file));
+});
+$("delete-note").addEventListener("click", function () {
+  deleteNote(pageByFile(current));
+});
+async function deleteNote(page) {
+  if (!page || $("delete-note").disabled) return;
+  if (location.hostname !== "127.0.0.1" || location.protocol !== "http:") {
+    alert("Для удаления запустите python3 scripts/wiki_html.py serve и откройте адрес из терминала.");
+    return;
+  }
+  if (!confirm("Удалить заметку «" + page.title + "»?")) return;
+  $("delete-note").disabled = true;
+  try {
+    var response = await fetch("/notes/" + encodeURIComponent(page.file), { method: "DELETE" });
+    if (response.status !== 204) throw new Error();
+    if (current === page.file) shown = "";
+    saveHash();
+    location.reload();
+  } catch (err) {
+    alert("Не удалось удалить заметку. Проверьте, что база запущена командой python3 scripts/wiki_html.py serve.");
+    $("delete-note").disabled = false;
+  }
+}
+$("recent").addEventListener("click", function (ev) {
+  var a = ev.target.closest("a[target=view]");
+  if (a && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && ev.button === 0) { ev.preventDefault(); openPage(a.getAttribute("href")); }
+});
+window.addEventListener("message", function (ev) {
+  var localFile = location.protocol === "file:" && ev.origin === "null";
+  if (ev.source !== view.contentWindow || (!localFile && ev.origin !== location.origin)) return;
+  var m = ev.data || {};
+  if (m.wiki === "page" && typeof m.href === "string") {
+    var href;
+    try { href = new URL(m.href); } catch (e) { return; }
+    if (href.protocol === location.protocol && new URL(".", href).href === new URL(".", location.href).href) {
+      showPage(href.pathname.split("/").pop() + href.hash);
+    }
+  }
+  else if (m.wiki === "search") focusSearch();
+});
+
+/* ---------- Свернуть / развернуть список ---------- */
+function setCollapsed(c) {
+  document.body.classList.toggle("collapsed", c);
+  $("toggle").textContent = c ? "»" : "«";
+  $("toggle").setAttribute("aria-label", c ? "Показать список" : "Свернуть список");
+  $("toggle").setAttribute("aria-expanded", String(!c));
+  try { localStorage.setItem("wiki-side", c ? "collapsed" : "open"); } catch (e) {}
+}
+$("toggle").addEventListener("click", function () { setCollapsed(!document.body.classList.contains("collapsed")); });
+function focusSearch() { setCollapsed(false); $("q").focus(); $("q").select(); }
+
+/* ---------- Клавиши ---------- */
+var timer = null;
+$("q").addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(search, 60); });
+$("q").addEventListener("keydown", function (ev) {
+  if (ev.key === "Enter") { search(); if (first) openPage(first.getAttribute("href")); }
+  else if (ev.key === "Escape") { $("q").value = ""; search(); }
+});
+document.addEventListener("keydown", function (ev) {
+  var inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName), key = (ev.key || "").toLowerCase();
+  if ((key === "/" && !inField) || (key === "k" && (ev.ctrlKey || ev.metaKey))) { ev.preventDefault(); focusSearch(); }
+});
+
+/* ---------- Главная без открытой заметки ---------- */
+var recent = PAGES.slice().sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || "") || cmpTitle(a, b); }).slice(0, 12);
+$("recent").innerHTML = recent.map(function (p) { return '<li><span class="d">' + esc(p.updated || "") + "</span>" + item(p) + "</li>"; }).join("");
+$("home-stats").textContent = PAGES.length + " " + plural(PAGES.length, "заметка", "заметки", "заметок") + ". Выберите заметку в списке слева или найдите её поиском.";
+
+/* ---------- Старт ---------- */
+var saved = null;
+try { saved = localStorage.getItem("wiki-side"); } catch (e) {}
+setCollapsed(saved === "collapsed");
+var hp = new URLSearchParams(location.hash.slice(1)), q0 = new URLSearchParams(location.search).get("q");
+var savedTab = null;
+try { savedTab = localStorage.getItem("wiki-tab"); } catch (e) {}
+var p0 = hp.get("p") && pageByFile(hp.get("p").split("#")[0]);
+setTab(hp.get("t") || (p0 ? tabOf(p0) : savedTab));
+if (q0 || hp.get("q")) $("q").value = q0 || hp.get("q");
+search();
+if (p0) openPage(hp.get("p"));
+if (q0) $("q").focus();  /* пришли из поля поиска на странице заметки */
+document.body.setAttribute("data-ready", "1");
+})();
+</script>
+</body>
+</html>

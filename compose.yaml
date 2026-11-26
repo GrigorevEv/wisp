@@ -1,0 +1,12 @@
+services:
+  wisp:
+    image: python:3.13-alpine
+    restart: always
+    user: "${WISP_UID:-1000}:${WISP_GID:-1000}"
+    working_dir: /app
+    command: ["python", "scripts/wiki_html.py", "serve", "--bind", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./scripts/wiki_html.py:/app/scripts/wiki_html.py:ro
+      - ./html:/app/html
