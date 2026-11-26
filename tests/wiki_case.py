@@ -21,9 +21,9 @@ class WikiCase(unittest.TestCase):
         self.html.mkdir()
         self.index = self.html / "index.html"
         shutil.copyfile(wiki.TEMPLATE.with_name("Индекс.html"), self.index)
-        for source in (Path(wiki.__file__), wiki.TEMPLATE):
+        for source in (Path(wiki.__file__), wiki.TEMPLATE, wiki.TEMPLATE.with_name("Индекс.html")):
             target = self.root / source.relative_to(wiki.PROJECT)
-            target.parent.mkdir()
+            target.parent.mkdir(exist_ok=True)
             shutil.copyfile(source, target)
 
     def cli(self, *args, ok=True):
