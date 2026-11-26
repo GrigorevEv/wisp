@@ -1,0 +1,12 @@
+[run]
+include = */scripts/wiki_html.py
+patch = subprocess
+sigterm = true
+
+[paths]
+wiki =
+    scripts
+    */scripts
+
+[report]
+precision = 1

@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Шаблон страницы базы знаний</title>
+<meta name="description" content="Эталон стиля HTML-страниц базы: общий CSS, движок схем WIKI.flow и WIKI.seq, примеры всех блоков.">
+<script>var t=(location.search.match(/[?&]theme=(light|dark)/)||[])[1];if(t)document.documentElement.setAttribute("data-theme",t)</script>
+<script type="application/json" id="wiki-meta">{"title":"Шаблон страницы базы знаний","aliases":[],"tags":[],"term":false,"section":"Входящие","sub":"","order":null,"level":null,"status":null,"parent":null,"source":null,"version":null,"md":null,"updated":"2026-10-24"}</script>
+<script type="application/json" id="wiki-tips">{"LUN (Logical Unit Number)":"LUN (Logical Unit Number) — простыми словами: номер «диска» внутри системы хранения."}</script>
+<style id="wiki-css">
+/* ============================================================
+   Стиль базы знаний. Источник — _templates/Заметка.html.
+   Во все страницы html/*.html копирует `wiki_html.py sync`.
+   Цвета только через переменные; тема светлая (?theme=dark — тёмная, только для проверки).
+   Схемы статичные. Интерактив — только виджетом .wg (кнопки, переключатели, статус, подсветка кода);
+   без hover-эффектов, анимации, теней, сворачивания и всплывающих подсказок.
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: light-dark(#f6f6f4, #131416);
+  --surface: light-dark(#ffffff, #1b1c1f);
+  --surface-2: light-dark(#f1f2f4, #232529);
+  --text: light-dark(#1c1d21, #e7e8ea);
+  --muted: light-dark(#5f636b, #a0a3ab);
+  --border: light-dark(#dcdde1, #2f3237);
+  --node-stroke: light-dark(#868b95, #737882);
+  --edge: light-dark(#8a919b, #737a84);
+  --accent: light-dark(#2457d6, #6ea4ff);
+  --accent-soft: light-dark(#e6edfc, #1b2a45);
+  --chg-bg: light-dark(#fff2df, #3a2a13);
+  --chg-stroke: light-dark(#c46f00, #e3a043);
+  --chg-text: light-dark(#8a4d00, #f0bd72);
+  --pause-bg: light-dark(#fde3e1, #3e1e1b);
+  --err: light-dark(#bf3a2b, #e46a5d);
+  --e-data: light-dark(#2563c9, #7aa7ff); --e-tm: light-dark(#8a3fc4, #c39bf0);
+  --e-cfg: light-dark(#0e8a82, #4fc9c0);  --e-sess: light-dark(#5d7f10, #a6c85a);
+  --lane-drv: light-dark(#eef4fd, #151d29);  --lane-drv-t: light-dark(#1f4e99, #9cc0ff);
+  --lane-core: light-dark(#f4f2f9, #1b1924); --lane-core-t: light-dark(#4b3a86, #c3b4f5);
+  --lane-dh: light-dark(#eef7f0, #141f18);   --lane-dh-t: light-dark(#23633a, #95d8aa);
+  --lane-ext: light-dark(#f7f6f2, #1c1b18);  --lane-ext-t: light-dark(#6b5d3a, #d4c08f);
+  --lane-hw: light-dark(#fbf0f6, #2a1824);   --lane-hw-t: light-dark(#8c2f6e, #eba6d6);
+  --dec-bg: light-dark(#e8f6f3, #12221f);    --dec-stroke: light-dark(#2a8a7e, #5cc2b6);
+  --q-bg: light-dark(#fff6dc, #2a2412);      --q-stroke: light-dark(#a7801a, #d8b04a);
+  --thr-c: light-dark(#2f63d1, #6ea4ff);
+  --ext-bg: light-dark(#eceef1, #24272b);
+  --sh-1: light-dark(rgba(0,0,0,.05), rgba(0,0,0,.3));
+  --sh-2: light-dark(rgba(0,0,0,.06), rgba(0,0,0,.25));
+  --shadow: 0 1px 2px var(--sh-1), 0 6px 20px var(--sh-2);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-padding-top: 70px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); }
+a { color: var(--accent); }
+code { font: 13px var(--mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- Верхняя панель ---------- */
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); }
+.top-in { max-width: 1440px; margin: 0 auto; padding: 8px 20px; display: flex; gap: 8px 22px; align-items: center; flex-wrap: wrap; }
+.top .home { font-weight: 700; color: var(--text); text-decoration: none; white-space: nowrap; }
+.top .home:hover { color: var(--accent); }
+.top .crumbs { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.top .crumbs a { color: var(--muted); text-decoration: none; }
+.top .crumbs a:hover { color: var(--accent); }
+.top nav { display: flex; gap: 4px 16px; flex-wrap: wrap; font-size: 14px; flex: 1 1 auto; }
+.top nav a { text-decoration: none; color: var(--muted); }
+.top nav a:hover { color: var(--accent); }
+
+/* ---------- Страница ---------- */
+.wrap { max-width: 1440px; margin: 0 auto; padding: 20px 20px 80px; }
+h1 { font-size: 26px; line-height: 1.25; margin: 6px 0 8px; }
+.sub { color: var(--muted); max-width: 900px; margin: 0; }
+.sub b, .sub strong { color: var(--text); }
+.intro { max-width: 920px; margin-top: 10px; }
+.intro > :first-child { margin-top: 0; }
+section.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 22px 24px 26px; margin-top: 22px; }
+h2 { font-size: 21px; margin: 0 0 6px; }
+h3 { font-size: 16px; margin: 22px 0 8px; }
+h4 { font-size: 15px; margin: 18px 0 6px; }
+h1 code, h2 code, h3 code, h4 code { font-size: .85em; }
+.lead { max-width: 920px; margin: 0 0 12px; }
+section.card > p, section.card > ul, section.card > ol, section.card > dl, section.card > blockquote,
+.intro > p, .intro > ul, .intro > ol { max-width: 920px; }
+section.card > p:first-of-type { margin-top: 4px; }
+section.card ul, section.card ol, .intro ul, .intro ol { padding-left: 22px; }
+section.card li, .intro li { margin: 2px 0; }
+section.card > ol.steps { max-width: none; padding-left: 0; }
+section.card li > p { margin: 4px 0; }
+blockquote { margin: 12px 0; padding: 2px 16px; border-left: 3px solid var(--border); color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+
+/* Формула (вместо LaTeX из md): <div class="formula">BM25(<var>D</var>, <var>Q</var>) = <span class="frac"><span>…</span><span>…</span></span></div> */
+.formula { font: 17px/2 "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin: 10px 0 14px; overflow-x: auto; max-width: 920px; }
+.formula var { font-style: italic; }
+.formula .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.5; margin: 0 3px; }
+.formula .frac > span:first-child { border-bottom: 1px solid currentColor; padding: 0 5px 1px; }
+.formula .frac > span:last-child { padding: 1px 5px 0; }
+.formula .big { font-size: 1.5em; vertical-align: -0.12em; }
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; overflow-x: auto; margin: 10px 0 14px; }
+pre code { background: none; padding: 0; border-radius: 0; font: 13px/1.5 var(--mono); }
+
+/* Блок «главное» и выноски */
+.changes, .callout { border: 1px solid var(--chg-stroke); background: var(--chg-bg); border-radius: 10px; padding: 10px 16px; margin: 12px 0 16px; max-width: 920px; }
+.changes b.h { color: var(--chg-text); }
+.changes ul, .callout ul, .callout ol { margin: 6px 0 2px; padding-left: 20px; }
+.callout { border-color: var(--accent); background: var(--accent-soft); }
+.callout > b.h, .callout > p:first-child > b.h:first-child { display: block; color: var(--accent); margin-bottom: 4px; }
+.changes > p { margin: 4px 0; }
+.callout > p { margin: 6px 0; }
+.callout > p:first-of-type { margin-top: 0; }
+.callout.callout-warning, .callout.callout-caution { border-color: var(--chg-stroke); background: var(--chg-bg); }
+.callout.callout-warning b.h, .callout.callout-caution b.h { color: var(--chg-text); }
+.callout.callout-danger, .callout.callout-bug { border-color: var(--err); background: var(--pause-bg); }
+.callout.callout-danger b.h, .callout.callout-bug b.h { color: var(--err); }
+.warn { border-left: 3px solid var(--err); padding: 4px 8px; font-size: 14px; }
+.note { color: var(--muted); font-size: 14px; max-width: 920px; }
+
+/* Ссылки на заметки */
+a.wl { text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+a.wl:hover { border-bottom-color: var(--accent); }
+.wl.planned { color: var(--muted); border-bottom: 1px dashed var(--node-stroke); }
+ul.chips, section.card ul.chips { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+ul.chips li { margin: 0; }
+ul.chips a.wl, ul.chips .wl.planned { display: inline-block; padding: 3px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); font-size: 14px; }
+ul.chips a.wl:hover { border-color: var(--accent); }
+
+/* Плашки meta */
+/* Большая заметка из частей (SCST.html): часть — h2.part-h, её карточки — h3.ch, оглавление — ol.toc */
+.wrap [id] { scroll-margin-top: 64px; }
+.part { margin-top: 56px; }
+.part-h { font-size: 25px; line-height: 1.25; margin: 0 0 8px; padding-top: 18px; border-top: 3px solid var(--border); }
+section.card > h3.ch { font-size: 21px; margin: 0 0 6px; }
+ol.toc { margin: 4px 0 14px; }
+ol.toc li { margin: 4px 0; }
+ol.toc .pill { margin-left: 8px; }
+ol.toc .ix-sum { color: var(--muted); font-size: 14px; margin-left: 8px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 1100px; }
+.pill { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 7px; border-radius: 5px; border: 1px solid; white-space: nowrap; line-height: 20px; }
+.pill.lvl { color: var(--lane-core-t); background: var(--lane-core); border-color: var(--lane-core-t); }
+.pill.ver { color: var(--muted); background: var(--surface-2); border-color: var(--border); font-weight: 500; font-family: var(--mono); font-size: 12px; }
+.pill.st-draft { color: var(--chg-text); background: var(--q-bg); border-color: var(--q-stroke); }
+.pill.st-ok { color: var(--lane-drv-t); background: var(--lane-drv); border-color: var(--lane-drv-t); }
+.pill.st-verified { color: var(--lane-dh-t); background: var(--lane-dh); border-color: var(--lane-dh-t); }
+.pill.term { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+.meta .mi code { font-size: 12px; }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; }
+.foot a { color: var(--muted); }
+
+/* Таблицы */
+.tbl { overflow-x: auto; margin-bottom: 14px; }
+table.tr { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 6px; }
+table.tr th, table.tr td { border: 1px solid var(--border); padding: 8px 10px; vertical-align: top; text-align: left; }
+table.tr th { background: var(--surface-2); }
+/* Узкие таблицы (до двух столбцов) не растягивать на всю карточку */
+table.tr:not(:has(th:nth-child(3), td:nth-child(3))) { width: auto; min-width: min(100%, 520px); max-width: 920px; }
+/* Первый столбец жирный, только если это короткие подписи строк (класс nw ставит конвертер) */
+table.tr.nw td:first-child { font-weight: 600; white-space: nowrap; }
+table.tr tr.grp td { background: var(--surface-2); font-weight: 700; }
+dl.gl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0 0; }
+dl.gl dt { font-weight: 600; }
+dl.gl dd { margin: 0; }
+
+/* Задачи (- [ ]) */
+li.task { list-style: none; margin-left: -20px; }
+.cb { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--node-stroke); border-radius: 3px; margin-right: 8px; vertical-align: -2px; }
+li.task.done .cb { background: var(--accent); border-color: var(--accent); }
+li.task.done { color: var(--muted); }
+
+/* Схема, которую ещё не перерисовали */
+figure.dia-todo { margin: 12px 0; border: 1.5px dashed var(--err); border-radius: 10px; padding: 8px 12px; }
+figure.dia-todo figcaption { color: var(--err); font-size: 13px; font-weight: 600; }
+figure.dia-todo pre { margin: 6px 0 0; max-height: 280px; }
+
+/* ---------- Схема + шаги ---------- */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin: 6px 0 10px; }
+.legend i { display: inline-block; width: 18px; height: 12px; border-radius: 3px; border: 1.5px solid; vertical-align: -1px; margin-right: 6px; }
+.legend i.dia { transform: rotate(45deg) scale(.75); border-radius: 1px; }
+.legend i.dot { width: 11px; height: 11px; border-radius: 50%; border: 0; background: var(--chg-stroke); }
+.legend i.ln { height: 0; border-width: 1.5px 0 0; border-radius: 0; border-color: var(--edge); }
+.legend i.ln.dash { border-top-style: dashed; }
+.legend i.ds { border-style: dashed; }
+
+.split { display: grid; grid-template-columns: minmax(0, auto) minmax(320px, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 1200px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.side { padding: 2px 0; }
+.svg-scroll { overflow-x: auto; }
+svg.dia { display: block; max-width: 100%; height: auto; min-width: 640px; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.stack .steps { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); margin-top: 14px; }
+.steps li.grp { font-size: 13px; font-weight: 700; color: var(--muted); margin: 10px 0 -2px 2px; }
+.steps li.grp:first-child { margin-top: 0; }
+.step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.step .num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font: 700 12px/24px var(--sans); text-align: center; }
+.step h4 { margin: 1px 0 4px; font-size: 15px; }
+.step p { margin: 0 0 6px; }
+.step p:last-child { margin-bottom: 0; }
+.step ul, .step ol { margin: 0 0 6px; padding-left: 18px; }
+.step ul:last-child, .step ol:last-child { margin-bottom: 0; }
+.step li { margin: 1px 0; }
+.step .tag { display: inline-block; font: 600 11px var(--sans); color: var(--chg-text); background: var(--chg-bg); border: 1px solid var(--chg-stroke); border-radius: 5px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.step .tag.hw { color: var(--lane-hw-t); background: var(--lane-hw); border-color: var(--lane-hw-t); }
+.step .proc { color: var(--muted); font-size: 13px; }
+/* Номер шага в тексте и таблицах — тот же значок, что на схеме */
+.ref { display: inline-block; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--accent); color: #fff; font: 700 11px/20px var(--sans); text-align: center; vertical-align: 1px; }
+.ref.hw { background: var(--lane-hw-t); color: light-dark(#fff, #2a1824); }
+/* Варианты одной схемы — друг под другом */
+figure.dia-var { margin: 16px 0 0; }
+figure.dia-var + figure.dia-var { border-top: 1px solid var(--border); padding-top: 14px; }
+figure.dia-var > figcaption { font-weight: 700; margin: 0 0 4px; }
+figure.dia-var > .note { margin: 0 0 8px; }
+
+/* ---------- SVG ---------- */
+.dia text { font-family: var(--sans); fill: var(--text); }
+.dia .t { font-size: 13.5px; font-weight: 600; }
+.dia .s { font-size: 11.5px; fill: var(--muted); }
+.dia .lt { font-size: 12.5px; font-weight: 700; }
+.dia .ls { font-size: 11.5px; fill: var(--muted); }
+.dia .el { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+.dia .el.dash { stroke-dasharray: 6 4; }
+.dia .el.err { stroke: var(--err); }
+.dia .el.chg { stroke: var(--chg-stroke); }
+.dia .el.hw { stroke: var(--lane-hw-t); }
+.dia .el.data { stroke: var(--e-data); } .dia .el.tm { stroke: var(--e-tm); } .dia .el.cfg { stroke: var(--e-cfg); } .dia .el.sess { stroke: var(--e-sess); }
+.dia .lab { font-size: 11.5px; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.dia .lab.err { fill: var(--err); }
+.dia .lab.chg { fill: var(--chg-text); }
+.dia .lab.hw { fill: var(--lane-hw-t); }
+.dia .lab.data { fill: var(--e-data); } .dia .lab.tm { fill: var(--e-tm); } .dia .lab.cfg { fill: var(--e-cfg); } .dia .lab.sess { fill: var(--e-sess); }
+.dia .shape { stroke-width: 1.5; }
+.dia .k-drv .shape { fill: var(--lane-drv); stroke: var(--lane-drv-t); }
+.dia .k-core .shape { fill: var(--lane-core); stroke: var(--lane-core-t); }
+.dia .k-disk .shape { fill: var(--lane-dh); stroke: var(--lane-dh-t); }
+.dia .k-hw .shape { fill: var(--lane-hw); stroke: var(--lane-hw-t); }
+.dia .k-pause .shape { fill: var(--q-bg); stroke: var(--q-stroke); stroke-dasharray: 6 4; }
+.dia .k-err .shape { fill: var(--pause-bg); stroke: var(--err); }
+.dia .k-dec .shape { fill: var(--dec-bg); stroke: var(--dec-stroke); }
+.dia .k-dec .t { font-size: 13px; }
+.dia .k-note .shape { fill: var(--surface-2); stroke: var(--muted); stroke-dasharray: 5 4; }
+.dia .k-thr .shape { fill: var(--surface); stroke: var(--thr-c); }
+.dia .k-q .shape { fill: var(--q-bg); stroke: var(--q-stroke); }
+.dia .k-ext .shape { fill: var(--ext-bg); stroke: var(--node-stroke); }
+.dia .k-ghost .shape { fill: none; stroke: var(--node-stroke); stroke-dasharray: 5 4; }
+.dia .k-ghost text { fill: var(--muted); }
+.dia .k-focus .shape { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+.dia .k-init .shape { fill: var(--text); stroke: none; }
+.dia .k-final .shape { fill: none; stroke: var(--text); stroke-width: 2; }
+.dia .k-final .core { fill: var(--text); }
+/* Значки СМО: узлы с полем q */
+.dia .qi .shape { stroke-width: 1.6; }
+.dia .qi .qsh { fill: none; opacity: .6; }
+.dia .qi.k-note .shape { stroke-dasharray: none; }
+.dia .qi .gl { fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.dia .qi .glf { stroke: none; }
+.dia .qi .qt { font-size: 12.5px; font-weight: 600; }
+.dia .own rect { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+.dia .own .ot { font-size: 10.5px; font-weight: 600; fill: var(--muted); }
+.dia .own.all rect { fill: var(--text); stroke: var(--text); }
+.dia .own.all .ot { fill: var(--surface); }
+.dia .k-hw .gl { stroke: var(--lane-hw-t); } .dia .k-hw .glf { fill: var(--lane-hw-t); }
+.dia .k-q .gl { stroke: var(--q-stroke); } .dia .k-q .glf { fill: var(--q-stroke); }
+.dia .k-thr .gl { stroke: var(--thr-c); } .dia .k-thr .glf { fill: var(--thr-c); }
+.dia .k-err .gl { stroke: var(--err); } .dia .k-err .glf { fill: var(--err); }
+.dia .k-dec .gl { stroke: var(--dec-stroke); } .dia .k-dec .glf { fill: var(--dec-stroke); }
+.dia .k-disk .gl { stroke: var(--lane-dh-t); } .dia .k-disk .glf { fill: var(--lane-dh-t); }
+.dia .k-note .gl { stroke: var(--muted); } .dia .k-note .glf { fill: var(--muted); }
+.dia .k-core .gl { stroke: var(--lane-core-t); } .dia .k-core .glf { fill: var(--lane-core-t); }
+.dia .k-drv .gl { stroke: var(--lane-drv-t); } .dia .k-drv .glf { fill: var(--lane-drv-t); }
+.dia .k-ext .gl { stroke: var(--node-stroke); } .dia .k-ext .glf { fill: var(--node-stroke); }
+/* Окно описания узла: поле tip, по клику */
+.dia .nd.tip { cursor: pointer; }
+.ndpop { position: absolute; z-index: 20; width: max-content; max-width: min(440px, calc(100vw - 16px)); padding: 10px 14px; background: var(--surface); color: var(--text); border: 1px solid var(--node-stroke); border-radius: 10px; font-size: 14px; line-height: 1.5; }
+.dia a.lnk .t { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 3px; }
+.dia .badge circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.dia .badge text { fill: #fff; font-size: 11px; font-weight: 700; }
+.dia .badge.hw circle { fill: var(--lane-hw-t); }
+.dia .badge.hw text { fill: light-dark(#fff, #2a1824); }
+.dia .chgdot { fill: var(--chg-stroke); stroke: var(--surface); stroke-width: 2; }
+.dia .lane-ext { fill: var(--lane-ext); } .dia .lane-t-ext { fill: var(--lane-ext-t); }
+.dia .lane-drv { fill: var(--lane-drv); } .dia .lane-t-drv { fill: var(--lane-drv-t); }
+.dia .lane-core { fill: var(--lane-core); } .dia .lane-t-core { fill: var(--lane-core-t); }
+.dia .lane-dh { fill: var(--lane-dh); } .dia .lane-t-dh { fill: var(--lane-dh-t); }
+.dia .lane-hw { fill: var(--lane-hw); } .dia .lane-t-hw { fill: var(--lane-hw-t); }
+.dia .lane-svc { fill: var(--surface-2); } .dia .lane-t-svc { fill: var(--muted); }
+/* seq */
+.dia .life { stroke: var(--node-stroke); stroke-width: 1; stroke-dasharray: 3 5; }
+.dia .blk { stroke: none; }
+.dia .blk-hw { fill: var(--lane-hw); }
+.dia .blk-grp { fill: var(--surface-2); }
+.dia .blk-err { fill: var(--pause-bg); }
+.dia .blk-alt { fill: none; stroke: var(--node-stroke); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.dia .blt { font-size: 11px; font-weight: 700; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.dia .blt-hw { fill: var(--lane-hw-t); }
+.dia .blt-err { fill: var(--err); }
+.dia .sepl { stroke: var(--border); stroke-width: 3; }
+.dia .sepb { fill: var(--surface-2); stroke: var(--node-stroke); stroke-width: 1; }
+.dia .sept { font-size: 12px; font-weight: 700; }
+.dia .gapt { font-size: 11.5px; font-style: italic; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+.dia .xm { stroke: var(--err); stroke-width: 2.2; }
+
+/* ---------- index.html: список заметок слева, окно просмотра справа ---------- */
+.ix-search { flex: 1 1 360px; max-width: 640px; position: relative; }
+.ix-search input { width: 100%; font: 15px var(--sans); padding: 7px 12px 7px 34px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); outline: none; }
+.ix-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ix-search::before { content: "⌕"; position: absolute; left: 11px; top: 5px; font-size: 17px; color: var(--muted); }
+.ix-search kbd { position: absolute; right: 9px; top: 7px; }
+form.ix-search { margin: 0; }
+.top .ix-search.pg { flex: 0 1 300px; }
+kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; color: var(--muted); background: var(--surface-2); }
+mark { background: color-mix(in srgb, var(--chg-stroke) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.in-frame .top { display: none; }
+html.in-frame { scroll-padding-top: 12px; }
+.in-frame .wrap [id] { scroll-margin-top: 12px; }
+body.ix-app { margin: 0; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+body.ix-app.collapsed { grid-template-columns: 46px minmax(0, 1fr); }
+.ix-side { display: flex; flex-direction: column; min-height: 0; background: var(--surface-2); border-right: 1px solid var(--border); }
+.ix-side-top { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 16px; }
+.ix-side-top .home { font-weight: 700; color: var(--text); text-decoration: none; flex: 1; white-space: nowrap; }
+.ix-btn { font: 15px/1 var(--sans); color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px 8px; cursor: pointer; }
+.ix-btn:hover { color: var(--text); border-color: var(--border); background: var(--surface); }
+.collapsed .ix-side-top { padding: 10px 6px; justify-content: center; }
+.collapsed .ix-side-top .home, .collapsed .ix-side-top .ix-tabs, .collapsed .ix-side > :not(.ix-side-top) { display: none; }
+.ix-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; margin-left: -8px; }
+.ix-tab { font: 600 14px/1.2 var(--sans); color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 5px 8px 4px; cursor: pointer; white-space: nowrap; }
+.ix-tab:hover { color: var(--text); }
+.ix-tab.on { color: var(--text); font-weight: 700; border-bottom-color: var(--accent); }
+.ix-empty .ix-tab { padding: 0; font-weight: 400; font-size: inherit; color: var(--accent); border: 0; text-decoration: underline; }
+.ix-side .ix-search { flex: none; max-width: none; margin: 0 10px 6px; }
+.ix-side .ix-search input { font-size: 14px; padding: 6px 10px 6px 30px; }
+.ix-side .ix-search::before { left: 10px; top: 4px; }
+.ix-side .ix-search kbd { top: 6px; }
+.ix-count { color: var(--muted); font-size: 12px; padding: 0 18px 4px; }
+.ix-list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 2px 6px 18px; }
+.ix-list a.ix-t { display: block; padding: 3px 10px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.ix-list a.ix-t:hover { background: var(--surface); }
+.ix-list a.ix-t.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ix-list li.res { margin: 0 0 6px; }
+.ix-list .ix-snip { color: var(--muted); font-size: 12.5px; line-height: 1.4; padding: 0 10px; }
+.ix-list .ix-hd { list-style: none; margin: 1px 0 0; padding: 0 10px; font-size: 12.5px; }
+.ix-list .ix-hd a { text-decoration: none; }
+.ix-empty { color: var(--muted); font-size: 13.5px; padding: 6px 10px; }
+.ix-view { position: relative; min-width: 0; min-height: 0; background: var(--bg); }
+.ix-view iframe { display: block; width: 100%; height: 100%; border: 0; }
+.ix-home { position: absolute; inset: 0; overflow-y: auto; }
+.ix-home .wrap { max-width: 900px; }
+.ix-recent { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; font-size: 14px; }
+.ix-recent .d { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px; }
+/* ---------- Виджет: модель, которую можно пощёлкать ----------
+   <div class="wg" id="wg-…" role="group" aria-label="…">: подписи .wg-lab, ряды ячеек .wg-cells > .wg-cell,
+   стрелка-связь между ячейками span.arr, дерево .wg-tree > div (уровень) > span (место узла, пустое — нет узла),
+   столбцы .wg-cols > .wg-col, кнопки и переключатели в .wg-row, пояснение шага в .wg-status (aria-live).
+   Код под виджетом — pre.wg-code, функции в span.fn[data-fn]; выполненная функция получает .hit.
+   Логика — в скрипте сразу после блока, в своей странице. Без hover, анимации и теней. */
+.wg { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin: 12px 0 10px; display: grid; gap: 12px; max-width: 920px; }
+.wg-lab { font: 600 12.5px var(--mono); color: var(--muted); margin-bottom: -6px; }
+.wg-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; font-size: 14px; }
+.wg-row .sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+.wg-row .opt { color: var(--muted); }
+.wg button { font: 600 14px/1.2 var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--node-stroke); border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+.wg button.main { background: var(--accent); border-color: var(--accent); color: light-dark(#fff, #10131a); }
+.wg button.danger { color: var(--err); border-color: var(--err); }
+.wg button.sq { min-width: 34px; padding: 6px 0; font-family: var(--mono); }
+.wg button:focus-visible, .wg input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wg label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+.wg input[type="number"] { width: 72px; font: 14px var(--mono); padding: 5px 8px; border: 1px solid var(--node-stroke); border-radius: 7px; background: var(--surface); color: var(--text); }
+.wg output, .wg .val { font: 700 15px var(--mono); min-width: 2.2em; text-align: center; display: inline-block; }
+.wg-status { background: var(--surface-2); border-radius: 7px; padding: 8px 12px; min-height: 3.1em; font-size: 14.5px; }
+.wg-status.bad { background: var(--pause-bg); color: var(--err); }
+.wg-status.good { background: var(--lane-dh); color: var(--lane-dh-t); }
+.wg-status code { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.wg-cells { display: flex; flex-wrap: wrap; gap: 4px; }
+.wg-cells .gap { width: 12px; }
+.wg-cell { min-width: 54px; flex: 0 0 auto; text-align: center; font: 600 14px/1.25 var(--mono); border: 1px solid var(--border); border-radius: 6px; padding: 5px 6px; background: var(--surface); }
+.wg-cell small { display: block; font: 400 11px/1.3 var(--mono); color: var(--muted); }
+.wg-cell.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.wg-cell.hit { background: var(--chg-bg); border-color: var(--chg-stroke); color: var(--chg-text); }
+.wg-cell.bad { background: var(--pause-bg); border-color: var(--err); color: var(--err); }
+.wg-cell.ok { background: var(--lane-dh); border-color: var(--lane-dh-t); color: var(--lane-dh-t); }
+.wg-cell.other { border-style: dashed; color: var(--muted); background: var(--surface-2); }
+.wg-cell.on small, .wg-cell.hit small, .wg-cell.bad small, .wg-cell.ok small { color: inherit; }
+.wg-cells .arr { align-self: center; font: 14px var(--mono); color: var(--muted); padding: 0 2px; }
+.wg-tree { display: grid; gap: 8px; }
+.wg-tree > div { display: flex; }
+.wg-tree > div > span { flex: 1 1 0; min-width: 0; display: flex; justify-content: center; }
+.wg-cols { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.wg-col { display: grid; gap: 4px; align-content: start; }
+.wg-col > b { font-size: 13px; text-align: center; }
+.wg-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.wg-legend i { display: inline-block; width: 13px; height: 13px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -2px; margin-right: 5px; }
+.wg-legend i.on { background: var(--accent-soft); border-color: var(--accent); }
+.wg-legend i.hit { background: var(--chg-bg); border-color: var(--chg-stroke); }
+.wg-legend i.bad { background: var(--pause-bg); border-color: var(--err); }
+.wg-legend i.ok { background: var(--lane-dh); border-color: var(--lane-dh-t); }
+.wg-legend i.other { background: var(--surface-2); border-style: dashed; }
+pre.wg-code { max-width: 920px; font: 13px/1.5 var(--mono); }
+pre.wg-code .fn { display: block; margin: 0 -8px; padding: 0 8px; border-radius: 4px; }
+pre.wg-code .fn.hit { background: var(--accent-soft); }
+pre.wg-code .c { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="home" href="../html/index.html">База знаний</a>
+  <form class="ix-search pg" action="../html/index.html" role="search"><input name="q" type="search" placeholder="Поиск по базе…" autocomplete="off" spellcheck="false" aria-label="Поиск"><kbd>/</kbd></form>
+  <span class="crumbs">Шаблон</span>
+  <nav>
+    <a href="#flow">Схема flow</a>
+    <a href="#seq">Схема seq</a>
+    <a href="#fsm">Автомат состояний</a>
+    <a href="#text">Текст, таблица, код</a>
+    <a href="#widget">Виджет</a>
+    <a href="#ref">Справка по движку</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+<h1>Шаблон страницы базы знаний</h1>
+<p class="sub">Эталон стиля: здесь собраны все виды блоков. Каждая страница <code>html/&lt;заметка&gt;.html</code> устроена так же: общий CSS (<code>&lt;style id="wiki-css"&gt;</code>) и движок схем (<code>&lt;script id="wiki-engine"&gt;</code>) копируются из этого файла командой <code>wiki_html.py sync</code>, менять их нужно только здесь. Схемы рисуются по данным с явными координатами, без Mermaid, PlantUML и картинок.</p>
+<div class="meta"><span class="pill lvl">L1</span><span class="pill st-draft">черновик</span><span class="pill st-ok">понятно</span><span class="pill st-verified">сверено с кодом</span><span class="pill ver">4.1.0 @ e0d02f22</span><span class="mi">выше: <a class="wl" href="#">Архитектура SCST</a></span><span class="mi">также: LUN, logical unit</span></div>
+
+<!-- ============ flow: дорожки, ромб, шаги справа ============ -->
+<section class="card" id="flow">
+  <h2>Схема flow: дорожки, ромб, шаги рядом</h2>
+  <p class="lead">Узлы и рёбра задаются данными <code>WIKI.flow("svg-…", {…})</code>. Номера на блоках совпадают с номерами шагов справа. Блок со ссылкой (<code>href</code>) ведёт на страницу заметки. Схема статичная: ничего не подсвечивается и не переключается. Интерактив — только в виджете (раздел «Виджет»).</p>
+  <div class="changes">
+    <b class="h">Блок «главное» (.changes)</b>
+    <ul><li>Для выводов и отличий версий.</li><li>Обычные выноски из md (<code>&gt; [!info]</code>) становятся <code>.callout</code>.</li></ul>
+  </div>
+  <div class="split">
+    <div class="svg-scroll"><svg class="dia" id="svg-ex1" role="img" aria-label="Пример flow"></svg></div>
+    <div class="side">
+      <ol class="steps">
+        <li class="grp">Приём</li>
+        <li class="step"><span class="num">1</span><div>
+          <h4>Команда пришла<span class="tag hw">⚙ железо</span></h4>
+          <p>HBA принял кадр и положил запись в кольцо. Тег <code>.tag.hw</code> отмечает шаги, которые делает железо.</p>
+        </div></li>
+        <li class="step"><span class="num">2</span><div>
+          <h4>Регистрация<span class="tag">отличается</span></h4>
+          <p>Ромб под блоком — проверка. Ребро с <code>cls: "err"</code> красное.</p>
+        </div></li>
+        <li class="grp">Выполнение</li>
+        <li class="step"><span class="num">3</span><div>
+          <h4>Отказ</h4>
+          <p>Ответ с ошибкой уходит сразу на отправку.</p>
+        </div></li>
+        <li class="step"><span class="num">4</span><div>
+          <h4>Работа диска</h4>
+          <p>Узел <code>k: "disk"</code>, справа — железо <code>k: "hw"</code> на своей дорожке. В тексте номер шага можно поставить значком <span class="ref">4</span>.</p>
+        </div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ seq ============ -->
+<section class="card" id="seq">
+  <h2>Схема seq: обмен сообщениями</h2>
+  <p class="lead">Участники — колонки, сообщения идут сверху вниз. <code>blocks</code> подсвечивают группу шагов (здесь — шаги, которые выполняет железо), <code>notes</code> — пояснения, <code>{sep: "…"}</code> — разделитель фаз, <code>{gap: "…"}</code> — пауза во времени. Варианты (<code>variants</code>, поле <code>only</code> и значения вида <code>{"ok": …, "fail": …}</code>) рисуются друг под другом, каждый со своей подписью.</p>
+  <div class="svg-scroll"><svg class="dia" id="svg-ex2" role="img" aria-label="Пример seq"></svg></div>
+</section>
+
+<!-- ============ автомат состояний ============ -->
+<section class="card stack" id="fsm">
+  <h2>Автомат состояний</h2>
+  <p class="lead">Начало — <code>k: "init"</code>, конец — <code>k: "final"</code>. Петля задаётся точками <code>via</code>, подпись — <code>lp: [x, y, "end"]</code>. Шаги под схемой — <code>section.card.stack</code>.</p>
+  <div class="svg-scroll"><svg class="dia" id="svg-ex3" role="img" aria-label="Пример автомата"></svg></div>
+  <ol class="steps">
+    <li class="step"><span class="num">1</span><div><h4>Работа</h4><p>Поток берёт команды из очереди.</p></div></li>
+    <li class="step"><span class="num">2</span><div><h4>Опрос</h4><p>Очередь пуста, поток ещё немного ждёт, не отдавая процессор.</p></div></li>
+    <li class="step"><span class="num">3</span><div><h4>Сон</h4><p>Процессор свободен.</p></div></li>
+  </ol>
+</section>
+
+<!-- ============ текст ============ -->
+<section class="card" id="text">
+  <h2>Текст, таблица, код</h2>
+  <p>Обычный абзац со ссылкой на заметку <a class="wl" href="lun-logical-unit-number.html">LUN</a> и на ещё не написанную <span class="wl planned" data-target="Жизненный цикл команды (SCST)">жизненный цикл команды</span>. Код в строке: <code>scst_rx_cmd()</code>.</p>
+  <div class="callout callout-info"><b class="h">Форк Aerodisk</b>
+    <ul><li><strong>emulex/</strong> — FC target-драйвер, которого нет в upstream.</li><li>Выноска строится из <code>&gt; [!info] Заголовок</code>.</li></ul>
+  </div>
+  <h3 id="таблица">Таблица</h3>
+  <div class="tbl"><table class="tr nw">
+    <thead><tr><th>Имя</th><th>Файл</th><th>Шаг</th></tr></thead>
+    <tbody>
+      <tr><td><code>scst_rx_cmd()</code></td><td><code>scst/src/scst_targ.c:671</code></td><td><span class="ref">2</span></td></tr>
+      <tr><td><code>blockio_exec_rw()</code></td><td><code>scst/src/dev_handlers/scst_vdisk.c:5818</code></td><td><span class="ref">4</span></td></tr>
+    </tbody>
+  </table></div>
+  <h3 id="код">Код</h3>
+<pre><code class="language-bash">echo 0 &gt; /sys/kernel/scst_tgt/poll_us
+scstadmin -list_target</code></pre>
+  <h3 id="задачи">Открытые вопросы</h3>
+  <ul>
+    <li class="task"><span class="cb"></span>В каком контексте реально идут шаги 5 и 9?</li>
+    <li class="task done"><span class="cb"></span>Закрытый вопрос.</li>
+  </ul>
+  <h3 id="см-также">См. также (чипы)</h3>
+  <ul class="chips"><li><a class="wl" href="lun-logical-unit-number.html">LUN (Logical Unit Number)</a></li><li><span class="wl planned" data-target="Объектная модель (SCST)">Объектная модель (SCST)</span></li></ul>
+  <figure class="dia-todo" data-lang="mermaid"><figcaption>Схема ещё не перерисована (mermaid). Исходник:</figcaption><pre><code>flowchart LR
+  A --&gt; B</code></pre></figure>
+</section>
+
+<!-- ============ виджет ============ -->
+<section class="card" id="widget">
+  <h2>Виджет</h2>
+  <p class="lead">Модель, которую можно пощёлкать: ячейки, кнопки, строка статуса и код под ней. Ставится, только если работу легче понять действием, чем текстом. Логика — в своём скрипте сразу после кода, в странице заметки.</p>
+  <div class="wg" id="wg-demo" role="group" aria-label="Пример виджета: массив из 4 ячеек">
+    <div class="wg-lab">int a[4]</div>
+    <div class="wg-cells" id="wg-demo-cells"></div>
+    <div class="wg-row">
+      <span>i =</span><button class="sq" id="wg-demo-dec">−</button><span class="val" id="wg-demo-i">0</span><button class="sq" id="wg-demo-inc">+</button>
+      <span class="sep"></span>
+      <button class="main" id="wg-demo-set">Записать</button>
+      <button id="wg-demo-get">Прочитать</button>
+      <label class="opt"><input type="checkbox" id="wg-demo-chk" checked> проверять индекс</label>
+    </div>
+    <div class="wg-legend"><span><i class="on"></i>есть значение</span><span><i class="hit"></i>ячейка последней операции</span><span><i class="bad"></i>ошибка</span><span><i class="other"></i>чужая память</span></div>
+    <div class="wg-status" id="wg-demo-msg" aria-live="polite"></div>
+  </div>
+<pre class="wg-code" id="wg-demo-code"><code><span class="fn" data-fn="set">void set(int i, int v) { a[i] = v; }</span><span class="fn" data-fn="get">int get(int i) { return a[i]; }</span></code></pre>
+<script>
+(function () {
+  var $ = function (s) { return document.getElementById("wg-demo-" + s); };
+  var a = [null, null, null, null], i = 0, last = -1, nv = 10;
+  function hit(fn) { $("code").querySelectorAll(".fn").forEach(function (e) { e.classList.toggle("hit", e.dataset.fn === fn); }); }
+  function draw() {
+    var s = "";
+    for (var k = 0; k < 4; k++) s += '<div class="wg-cell' + (k === last ? " hit" : a[k] !== null ? " on" : "") + '">' + (a[k] === null ? "·" : a[k]) + "<small>[" + k + "]</small></div>";
+    s += '<div class="wg-cell other' + (last === 4 ? " bad" : "") + '">?<small>за массивом</small></div>';
+    $("cells").innerHTML = s; $("i").textContent = i;
+  }
+  function msg(t, c) { var m = $("msg"); m.textContent = t; m.className = "wg-status" + (c ? " " + c : ""); }
+  $("dec").onclick = function () { i = Math.max(0, i - 1); last = -1; draw(); };
+  $("inc").onclick = function () { i = Math.min(4, i + 1); last = -1; draw(); };
+  $("set").onclick = function () {
+    hit("set");
+    if (i === 4 && $("chk").checked) { last = -1; draw(); msg("Индекс 4 вне массива — запись отклонена.", "bad"); return; }
+    last = i; if (i < 4) a[i] = nv; draw();
+    msg(i < 4 ? "a[" + i + "] = " + nv++ + "." : "Записано за концом массива: испорчена чужая память.", i < 4 ? "" : "bad");
+  };
+  $("get").onclick = function () { hit("get"); last = i; draw(); msg(i < 4 ? "a[" + i + "] = " + (a[i] === null ? "мусор" : a[i]) + "." : "Прочитана чужая память.", i < 4 ? "" : "bad"); };
+  draw(); msg("Выберите индекс и нажмите «Записать».");
+})();
+</script>
+</section>
+
+<!-- ============ справка ============ -->
+<section class="card" id="ref">
+  <h2>Справка по движку</h2>
+  <h3>WIKI.flow(svgId, D)</h3>
+  <dl class="gl">
+    <dt>D.vw, D.vh</dt><dd>размер холста. Координаты узлов — центры блоков.</dd>
+    <dt>nodes{ID: …}</dt><dd><code>k</code> вид · <code>x, y</code> центр · <code>w, h</code> (высота считается по тексту) · <code>t</code> заголовок, <code>s</code> подпись (перенос — <code>\n</code>) · <code>n</code> номер-бейдж · <code>chg</code> оранжевая точка · <code>al: "left"</code> · <code>href</code> имя заметки · <code>shape: "db"</code> цилиндр · <code>only</code> вариант · <code>q</code> значок СМО вместо блока: <code>src queue thr irq hold fork lost sink ctl step</code>, текст рядом со значком, сторона — <code>tp: "r" | "l" | "t" | "b"</code>, над или под боковой линией — <code>"rt" | "rb" | "lt" | "lb"</code>; <code>many: true</code> — стопка, таких несколько; <code>own</code> — метка «чьё» перед заголовком (<code>"ядро"</code>, <code>"пара"</code>), <code>oc: "all"</code> — одна на всю систему, метка залита · <code>tip</code> — <code>id</code> элемента страницы (пункта пояснений): по клику на узел его текст показывается в окне под узлом</dd>
+    <dt>виды k</dt><dd><code>ext drv core disk hw thr q dec pause err note ghost focus init final</code></dd>
+    <dt>edges[…]</dt><dd><code>f, t</code> узлы · <code>fs, ts</code> стороны <code>t b l r</code> · <code>fo, to</code> сдвиг вдоль стороны · <code>via</code> точки излома · <code>straight</code> · <code>lab</code> подпись, <code>lp: [x, y, anchor]</code> · <code>cls</code>: <code>dash err chg hw</code>, цвета видов заявок СМО <code>data tm cfg sess</code> (образец в легенде — <code>border-color:var(--e-tm)</code>) · <code>mk: "none" | "both"</code></dd>
+    <dt>lanes[…]</dt><dd>вертикальные дорожки <code>{x, w, y0, y1, c, t, left}</code>; <code>c</code>: <code>ext drv core dh svc hw</code></dd>
+    <dt>rows[…]</dt><dd>горизонтальные полосы во всю ширину <code>{y0, y1, c, t, s}</code></dd>
+    <dt>variants</dt><dd><code>[{id, t}]</code> — схема рисуется по разу на каждый вариант, друг под другом, с подписью <code>vlabel: t</code>; <code>only: "id"</code> у узла или ребра, значения вида <code>{"id1": …, "id2": …}</code>; элементы секции с <code>data-only="id"</code> переезжают под подпись своего варианта</dd>
+    <dt>legend</dt><dd>строится по использованным видам; <code>{вид: "подпись" | false}</code> переопределяет, <code>false</code> — без легенды; <code>extra: [[подпись, style, класс]]</code></dd>
+  </dl>
+  <h3>WIKI.seq(svgId, D)</h3>
+  <dl class="gl">
+    <dt>parts[…]</dt><dd><code>{id, t, s, k, shape: "db", href}</code>; колонки через <code>D.colw</code> (170)</dd>
+    <dt>msgs[…]</dt><dd><code>{f, t, lab, n, id, cls}</code>; <code>cls</code>: <code>dash err hw chg lost</code>; <code>f = t</code> — сообщение себе; <code>{sep}</code>, <code>{gap}</code>, <code>{note, over | right | left}</code>; <code>D.autonumber</code> — номера по порядку</dd>
+    <dt>blocks[…]</dt><dd><code>{from, to, lab, k}</code> — по <code>id</code>, <code>n</code> или <code>ref</code> сообщений (<code>ref</code> — номер без значка, для блоков); <code>k</code>: <code>hw grp err alt</code></dd>
+    <dt>notes[…]</dt><dd><code>{at, over, text}</code> — после сообщения <code>at</code> (0 — в начале)</dd>
+  </dl>
+  <p class="note">Ошибки описания пишутся в консоль и в атрибут <code>data-errors</code> у <code>&lt;svg&gt;</code>; их ловит <code>wiki_html.py check --render</code>.</p>
+</section>
+
+<footer class="foot">источник: <code>_templates/Заметка.html</code> · обновлено 2026-10-24</footer>
+</div>
+
+<script id="wiki-engine">
+/* ============================================================
+   WIKI — движок схем базы знаний: WIKI.flow, WIKI.seq.
+   Только рисует: без подсветки и переключателей. Единственная реакция на клик —
+   окно описания узла (поле tip), по просьбе пользователя 2026-11-17.
+   Источник — _templates/Заметка.html, копирует `wiki_html.py sync`.
+   ============================================================ */
+(function () {
+"use strict";
+var NS = "http://www.w3.org/2000/svg";
+var W = window.WIKI = {};
+var TH = 16.5, SH = 14.5, LH = 14;
+/* Страницы, на которые ссылаются узлы схем (href): имя заметки → файл страницы.
+   Узел становится ссылкой, только если страница есть. Блок wiki-tips заполняет `wiki_html.py links`. */
+var TIPS = {};
+try { TIPS = JSON.parse((document.getElementById("wiki-tips") || {}).textContent || "{}"); } catch (e) { TIPS = {}; }
+
+/* Виды узлов: подпись в легенде, образец, класс образца */
+var KINDS = {
+  focus: ["тема заметки", "background:var(--accent-soft);border-color:var(--accent)"],
+  ext: ["внешний участник", "background:var(--ext-bg);border-color:var(--node-stroke)"],
+  hw: ["железо", "background:var(--lane-hw);border-color:var(--lane-hw-t)"],
+  drv: ["драйвер, транспорт", "background:var(--lane-drv);border-color:var(--lane-drv-t)"],
+  core: ["ядро, логика", "background:var(--lane-core);border-color:var(--lane-core-t)"],
+  disk: ["хранилище", "background:var(--lane-dh);border-color:var(--lane-dh-t)"],
+  thr: ["поток (исполнитель)", "background:var(--surface);border-color:var(--thr-c)"],
+  q: ["очередь", "background:var(--q-bg);border-color:var(--q-stroke)"],
+  dec: ["проверка «да / нет»", "background:var(--dec-bg);border-color:var(--dec-stroke)", "dia"],
+  pause: ["ожидание", "background:var(--q-bg);border-color:var(--q-stroke)", "ds"],
+  err: ["ошибка, отказ", "background:var(--pause-bg);border-color:var(--err)"],
+  note: ["особый случай", "background:var(--surface-2);border-color:var(--muted)", "ds"],
+  ghost: ["нет в этом варианте", "border-color:var(--node-stroke)", "ds"],
+  init: null, final: null
+};
+var EXTRA = {
+  hwblk: ["шаги, которые делает железо", "background:var(--lane-hw);border-color:color-mix(in srgb, var(--lane-hw-t) 30%, transparent)"],
+  chg: ["отличается в вариантах", "", "dot"],
+  dash: ["особый случай", "", "ln dash"],
+  lost: ["сообщение не дошло (✕)", "border-color:var(--err)", "ln"]
+};
+var LANES = { ext: 1, drv: 1, core: 1, dh: 1, svc: 1, hw: 1 };
+var SIDES = { t: 1, b: 1, l: 1, r: 1 };
+var BLOCKS = { hw: 1, grp: 1, err: 1, alt: 1 };
+
+function el(tag, attrs, parent) {
+  var e = document.createElementNS(NS, tag);
+  for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, x, y, s, cls, anchor) {
+  var t = el("text", { x: x, y: y, "class": cls, "text-anchor": anchor || "middle" }, parent);
+  t.textContent = s;
+  return t;
+}
+function lines(s) { return s ? String(s).split("\n") : []; }
+function num(x) { return typeof x === "number" && isFinite(x); }
+/* href узла — имя заметки (можно с #якорем); файл страницы — из wiki-tips (транслит имени) */
+function pageHref(name) {
+  var i = name.indexOf("#"), h = i >= 0 ? name.slice(i) : "";
+  name = i >= 0 ? name.slice(0, i) : name;
+  return { name: name, url: (TIPS[name] || "") + h.replace(/ /g, "-").toLowerCase() };
+}
+
+/* Варианты: { "a": …, "b": … } и only: "a" | ["a", "b"] */
+function variantOps(D) {
+  var ids = (D.variants || []).map(function (v) { return v.id; });
+  function isVar(x) {
+    if (!ids.length || x === null || typeof x !== "object" || Array.isArray(x)) return false;
+    var ks = Object.keys(x);
+    return ks.length > 0 && ks.every(function (k) { return ids.indexOf(k) >= 0; });
+  }
+  return {
+    V: function (x) { return isVar(x) ? x[D._v] : x; },
+    all: function (x) { return isVar(x) ? Object.keys(x).map(function (k) { return x[k]; }) : [x]; },
+    vis: function (o) {
+      if (!o || o.only == null) return true;
+      var a = Array.isArray(o.only) ? o.only : String(o.only).split(/[\s,]+/);
+      return a.indexOf(D._v) >= 0;
+    },
+    ids: ids
+  };
+}
+
+function markers(svg, id) {
+  var defs = el("defs", {}, svg);
+  [["a", "--edge"], ["err", "--err"], ["chg", "--chg-stroke"], ["hw", "--lane-hw-t"], ["data", "--e-data"], ["tm", "--e-tm"], ["cfg", "--e-cfg"], ["sess", "--e-sess"]].forEach(function (m) {
+    var mk = el("marker", { id: "mk-" + id + "-" + m[0], viewBox: "0 0 10 10", refX: 9, refY: 5,
+      markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", style: "fill: var(" + m[1] + ")" }, mk);
+  });
+}
+/* Цвет ребра: первый подходящий класс; data tm cfg sess — сущности СМО */
+var ECLS = ["err", "chg", "hw", "data", "tm", "cfg", "sess"];
+function eCls(cls) { var w = " " + (cls || "") + " "; for (var i = 0; i < ECLS.length; i++) if (w.indexOf(" " + ECLS[i] + " ") >= 0) return ECLS[i]; return ""; }
+function mkName(cls) { return eCls(cls) || "a"; }
+function labCls(cls) { return eCls(cls); }
+function edgePath(g, id, pts, cls, mk) {
+  var p = el("path", { d: "M" + pts.map(function (q) { return q[0] + "," + q[1]; }).join(" L"), "class": "el " + (cls || "") }, g);
+  var m = "url(#mk-" + id + "-" + mkName(cls || "") + ")";
+  if (mk !== "none") p.setAttribute("marker-end", m);
+  if (mk === "both") p.setAttribute("marker-start", m);
+  return p;
+}
+function drawLabel(g, pos, s, cls) {
+  var ls = lines(s);
+  var y0 = pos.above ? pos.y + 4 - (ls.length - 1) * LH : pos.y + 4 - (ls.length - 1) * LH / 2;
+  ls.forEach(function (ln, i) { txt(g, pos.x, y0 + i * LH, ln, "lab " + cls, pos.anchor); });
+}
+
+/* Значки СМО (система массового обслуживания): узел с полем q рисуется маленьким значком,
+   заголовок и подпись — рядом (tp: r справа, l слева, t сверху, b снизу). Стрелки цепляются к значку.
+   many — стопка из трёх значков: таких очередей или потоков несколько. k по умолчанию — из таблицы. */
+var QI = {
+  src:   { k: "hw",   w: 26, h: 26 },   /* источник заявок ▶ */
+  queue: { k: "q",    w: 42, h: 20 },   /* очередь: ящик с заявками */
+  thr:   { k: "thr",  w: 26, h: 26 },   /* канал: поток, часы */
+  irq:   { k: "thr",  w: 26, h: 26 },   /* канал без сна: прерывание, softirq, tasklet, молния */
+  hold:  { k: "err",  w: 26, h: 26 },   /* кран: «въезд запрещён» */
+  fork:  { k: "dec",  w: 28, h: 28 },   /* развилка */
+  lost:  { k: "err",  w: 26, h: 26 },   /* отказ, потеря ✕ */
+  sink:  { k: "disk", w: 26, h: 26 },   /* сток ✕ */
+  ctl:   { k: "note", w: 20, h: 26 },   /* управление: файл, запись в него */
+  step:  { k: "core", w: 30, h: 20 }    /* действие в том же потоке */
+};
+var TQ = 15, SQ = 13.5;
+var QTP = { r: 1, l: 1, t: 1, b: 1, rt: 1, rb: 1, lt: 1, lb: 1 };
+function qShape(g, q, x, y, w, h, cls) {
+  if (q === "queue") return el("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 2, "class": cls }, g);
+  if (q === "fork") return el("polygon", { points: [x, y - h / 2, x + w / 2, y, x, y + h / 2, x - w / 2, y].join(" "), "class": cls }, g);
+  if (q === "step") return el("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 5, "class": cls }, g);
+  if (q === "ctl") return el("path", { d: "M" + (x - w / 2) + "," + (y - h / 2) + " h" + (w - 6) + " l6,6 v" + (h - 6) + " h" + (-w) + " z", "class": cls }, g);
+  return el("circle", { cx: x, cy: y, r: w / 2, "class": cls }, g);
+}
+function qGlyph(g, q, x, y, w, h) {
+  var P = function (d, f) { el("path", { d: d, "class": f ? "glf" : "gl" }, g); };
+  switch (q) {
+    case "src": P("M" + (x - 3.5) + "," + (y - 6.5) + " L" + (x + 6.5) + "," + y + " L" + (x - 3.5) + "," + (y + 6.5) + " Z", 1); break;
+    case "queue":
+      for (var i = 0; i < 3; i++) el("rect", { x: x + w / 2 - 3 - (i + 1) * 5 - i * 2.5, y: y - 6, width: 5, height: 12, rx: 1, "class": "glf" }, g);
+      break;
+    case "thr": P("M" + x + "," + (y - 7.5) + " L" + x + "," + y + " L" + (x + 5.5) + "," + (y + 3.5)); break;
+    case "irq": P("M" + (x + 2) + "," + (y - 9) + " L" + (x - 5) + "," + (y + 1.5) + " L" + (x - 0.5) + "," + (y + 1.5) + " L" + (x - 2) + "," + (y + 9) + " L" + (x + 5) + "," + (y - 1.5) + " L" + (x + 0.5) + "," + (y - 1.5) + " Z", 1); break;
+    case "hold": el("rect", { x: x - 7.5, y: y - 2.25, width: 15, height: 4.5, rx: 1, "class": "glf" }, g); break;
+    case "lost": case "sink": P("M" + (x - 5.5) + "," + (y - 5.5) + " L" + (x + 5.5) + "," + (y + 5.5) + " M" + (x + 5.5) + "," + (y - 5.5) + " L" + (x - 5.5) + "," + (y + 5.5)); break;
+    case "ctl": P("M" + (x + w / 2 - 6) + "," + (y - h / 2) + " v6 h6 M" + (x - w / 2 + 4) + "," + (y + 1) + " h" + (w - 8) + " M" + (x - w / 2 + 4) + "," + (y + 6) + " h" + (w - 8)); break;
+    case "step": P("M" + (x - 7) + "," + y + " h13 M" + (x + 2) + "," + (y - 4.5) + " l4.5,4.5 l-4.5,4.5"); break;
+  }
+}
+/* Метка владельца: на что заведены очередь, поток или кран (одна на систему, на ядро, на пару…).
+   oc: "all" — одна на всю систему, метка залита. Ширина — по тексту. */
+var OWN_H = 15, OWN_OC = { all: 1 };
+function ownPill(g, t, oc) {
+  var pg = el("g", { "class": "own" + (oc ? " " + oc : "") }, g);
+  var r = el("rect", { x: 0, y: 0, height: OWN_H, rx: OWN_H / 2 }, pg);
+  var tt = txt(pg, 0, 11, t, "ot", "middle"), w = 0;
+  try { w = tt.getComputedTextLength(); } catch (e) { w = 0; }
+  if (!w) w = String(t).length * 6.4;
+  w = Math.ceil(w + 12);
+  r.setAttribute("width", w);
+  tt.setAttribute("x", w / 2);
+  return { g: pg, w: w };
+}
+function drawQ(grp, n) {
+  var x = n.x, y = n.y, w = n.w, h = n.h, q = n.q, st = n.many ? 10 : 0;
+  if (n.many) { qShape(grp, q, x + 10, y - 8, w, h, "shape qsh"); qShape(grp, q, x + 5, y - 4, w, h, "shape qsh"); }
+  qShape(grp, q, x, y, w, h, "shape");
+  qGlyph(grp, q, x, y, w, h);
+  var tp = n.tp || "r", H = (n.tl.length || (n.own ? 1 : 0)) * TQ + n.sl.length * SQ, tx, top, anc;
+  /* r, l — сбоку по центру; rt, rb, lt, lb — сбоку над или под линией, которая выходит из значка вбок */
+  if (tp.charAt(0) === "r") { tx = x + w / 2 + 7 + st; anc = "start"; }
+  else if (tp.charAt(0) === "l") { tx = x - w / 2 - 7; anc = "end"; }
+  else { tx = x; anc = "middle"; }
+  if (tp === "t") top = y - h / 2 - 6 - st - H;
+  else if (tp === "b") top = y + h / 2 + 5;
+  else if (tp.charAt(1) === "t") top = y - 5 - H;
+  else if (tp.charAt(1) === "b") top = y + 4;
+  else top = y - H / 2;
+  /* own — метка «чьё» в строке заголовка, со стороны значка; при tp t, b метка и заголовок вместе по центру */
+  var P = n.own ? ownPill(grp, n.own, n.oc) : null, ox = 0, cy = top;
+  function putP(px) { P.g.setAttribute("transform", "translate(" + px + "," + (top - 0.5) + ")"); }
+  if (P && anc === "start") { ox = P.w + 5; putP(tx); }
+  else if (P && anc === "end") { ox = -(P.w + 5); putP(tx - P.w); }
+  else if (P) putP(tx - P.w / 2);
+  if (P && !n.tl.length) cy += TQ;
+  n.tl.forEach(function (ln, i) {
+    cy += TQ;
+    var e = txt(grp, tx + ox, cy - 4, ln, "qt", anc);
+    if (P && anc === "middle" && i === 0) {
+      var tw = 0;
+      try { tw = e.getComputedTextLength(); } catch (er) { tw = 0; }
+      if (!tw) tw = String(ln).length * 7;
+      var x0 = tx - (P.w + 5 + tw) / 2;
+      putP(x0);
+      e.setAttribute("x", x0 + P.w + 5);
+      e.setAttribute("text-anchor", "start");
+    }
+  });
+  n.sl.forEach(function (ln) { cy += SQ; txt(grp, tx, cy - 3.5, ln, "s", anc); });
+  if (n.n != null) badge(grp, x - w / 2 - 2, y - h / 2 - 2, n.n, false);
+}
+
+/* Блок: прямоугольник, ромб или цилиндр с заголовком и подписью */
+function boxContent(n) { return n.tl.length * TH + n.sl.length * SH + (n.tl.length && n.sl.length ? 2 : 0); }
+function drawBox(g, n) {
+  var parent = g, grp;
+  if (n.href) {
+    var ph = pageHref(n.href);
+    if (Object.prototype.hasOwnProperty.call(TIPS, ph.name)) parent = el("a", { href: ph.url, "class": "lnk" }, g);
+  }
+  grp = el("g", { "class": "nd k-" + n.k + (n.q ? " qi qi-" + n.q : "") + (n.tip ? " tip" : ""), "data-tip": n.tip }, parent);
+  if (n.q) { drawQ(grp, n); return grp; }
+  var x = n.x, y = n.y, w = n.w, h = n.h;
+  if (n.k === "init") { el("circle", { cx: x, cy: y, r: 9, "class": "shape" }, grp); return grp; }
+  if (n.k === "final") {
+    el("circle", { cx: x, cy: y, r: 12, "class": "shape" }, grp);
+    el("circle", { cx: x, cy: y, r: 7, "class": "core" }, grp);
+    return grp;
+  }
+  var dy = 0;
+  if (n.k === "dec") el("polygon", { points: [x, y - h / 2, x + w / 2, y, x, y + h / 2, x - w / 2, y].join(" "), "class": "shape" }, grp);
+  else if (n.shape === "db") {
+    var rx = w / 2, ry = 7, x0 = x - w / 2, y0 = y - h / 2;
+    el("path", { d: "M" + x0 + "," + (y0 + ry) + " a" + rx + "," + ry + " 0 0 1 " + w + ",0 v" + (h - 2 * ry) + " a" + rx + "," + ry + " 0 0 1 " + (-w) + ",0 z", "class": "shape" }, grp);
+    el("path", { d: "M" + x0 + "," + (y0 + ry) + " a" + rx + "," + ry + " 0 0 0 " + w + ",0", "class": "shape", style: "fill:none" }, grp);
+    dy = ry / 2 + 1;
+  } else el("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 10, "class": "shape" }, grp);
+  var cy = y - boxContent(n) / 2 + dy;
+  var tx = n.al === "left" ? x - w / 2 + 14 : x, anc = n.al === "left" ? "start" : "middle";
+  n.tl.forEach(function (ln) { cy += TH; txt(grp, tx, cy - 4.5, ln, "t", anc); });
+  if (n.tl.length && n.sl.length) cy += 2;
+  n.sl.forEach(function (ln) { cy += SH; txt(grp, tx, cy - 4, ln, "s", anc); });
+  if (n.chg) {
+    var cx = n.k === "dec" ? x + w / 4 + 4 : x + w / 2 - 3, cyy = n.k === "dec" ? y - h / 4 - 4 : y - h / 2 + 3;
+    el("circle", { cx: cx, cy: cyy, r: 6, "class": "chgdot" }, grp);
+  }
+  if (n.n != null) {
+    if (n.k === "dec") badge(grp, x - w / 4 - 4, y - h / 4 - 4, n.n, false);
+    else badge(grp, x - w / 2 + 3, y - h / 2 + 3, n.n, n.k === "hw");
+  }
+  return grp;
+}
+function badge(g, x, y, s, hw) {
+  var b = el("g", { "class": "badge" + (hw ? " hw" : "") }, g);
+  el("circle", { cx: x, cy: y, r: 10 }, b);
+  txt(b, x, y + 4, String(s), "");
+}
+
+/* ---------- Легенда ---------- */
+function legendFor(D, used) {
+  var box = document.querySelector('[data-legend-for="' + D._svg + '"]');
+  if (D.legend === false) { if (box) box.innerHTML = ""; return; }
+  var L = D.legend || {}, items = [];
+  Object.keys(KINDS).forEach(function (k) {
+    if (!used[k] || !KINDS[k] || L[k] === false) return;
+    items.push([L[k] || KINDS[k][0], KINDS[k][1], KINDS[k][2]]);
+  });
+  Object.keys(EXTRA).forEach(function (k) {
+    if (!used[k] || L[k] === false) return;
+    var lab = L[k] || (k === "dash" && D._kind === "seq" ? "ответ" : EXTRA[k][0]);
+    items.push([lab, EXTRA[k][1], EXTRA[k][2]]);
+  });
+  (L.extra || []).forEach(function (x) { items.push(x); });
+  if (!box) {
+    box = document.createElement("div");
+    box.className = "legend";
+    var svg = document.getElementById(D._svg), at = svg.closest(".split") || svg.closest(".svg-scroll") || svg;
+    at.parentNode.insertBefore(box, at);
+  }
+  box.className = "legend";
+  box.innerHTML = "";
+  items.forEach(function (it) {
+    var sp = document.createElement("span"), i = document.createElement("i");
+    if (it[2]) i.className = it[2];
+    if (it[1]) i.setAttribute("style", it[1]);
+    sp.appendChild(i);
+    sp.appendChild(document.createTextNode(it[0]));
+    box.appendChild(sp);
+  });
+}
+/* Схема с вариантами (D.variants) рисуется по разу на каждый вариант, друг под другом:
+   <figure class="dia-var"> с подписью; элементы секции с data-only="id" переезжают в свой вариант. */
+function setup(svgId, D, kind, draw, usedFn) {
+  var svg = document.getElementById(svgId);
+  if (!svg) { console.error("WIKI: нет <svg id=\"" + svgId + "\">"); return; }
+  D._svg = svgId; D._kind = kind;
+  D.id = D.id || svgId.replace(/^svg-/, "");
+  var X = variantOps(D);
+  function drawOne(s) {
+    var errs = [], count = 0;
+    try { count = draw(s, D, X, errs); } catch (e) { errs.push("исключение: " + (e && e.message || e)); }
+    if (errs.length) {
+      s.setAttribute("data-errors", errs.join(" | "));
+      errs.forEach(function (m) { console.error("WIKI " + s.id + ": " + m); });
+    }
+    s.setAttribute("data-rendered", String(count || 0));
+  }
+  try { legendFor(D, usedFn(D, X)); } catch (e) { console.error("WIKI " + svgId + ": легенда: " + e.message); }
+  if (!D.variants || !D.variants.length) { D._mid = D.id; drawOne(svg); return; }
+  var host = svg.closest(".svg-scroll") || svg, parent = host.parentNode, after = host.nextSibling;
+  if (parent.classList && parent.classList.contains("split")) {
+    /* в .split все варианты — одна колонка сетки */
+    var col = document.createElement("div");
+    parent.insertBefore(col, host);
+    col.appendChild(host);
+    parent = col; after = null;
+  }
+  var sec = svg.closest("section") || document.body;
+  var only = Array.prototype.slice.call(sec.querySelectorAll("[data-only]"));
+  D.variants.forEach(function (v, i) {
+    var fig = document.createElement("figure"), cap = document.createElement("figcaption");
+    fig.className = "dia-var";
+    cap.textContent = (D.vlabel === false ? "" : (D.vlabel || "Вариант") + ": ") + (v.t || v.id);
+    fig.appendChild(cap);
+    only.forEach(function (e) {
+      if (e.getAttribute("data-only").split(/[\s,]+/).indexOf(v.id) >= 0) fig.appendChild(e.cloneNode(true));
+    });
+    parent.insertBefore(fig, after);
+    var s = svg, h = host;
+    if (i > 0) {
+      s = svg.cloneNode(false);
+      s.id = svgId + "-" + v.id;
+      if (host !== svg) { h = host.cloneNode(false); h.appendChild(s); } else h = s;
+    }
+    fig.appendChild(h);
+    D._v = v.id; D._mid = D.id + "-" + v.id;
+    drawOne(s);
+  });
+  only.forEach(function (e) { if (e.parentNode && !e.closest("figure.dia-var")) e.parentNode.removeChild(e); });
+}
+
+/* ---------- WIKI.flow ---------- */
+function flowUsed(D, X) {
+  var u = {};
+  Object.keys(D.nodes || {}).forEach(function (id) {
+    var r = D.nodes[id];
+    X.all(r.k || (r.q && QI[r.q] ? QI[r.q].k : r.k)).forEach(function (k) { u[k] = 1; });
+    if (r.chg) u.chg = 1;
+  });
+  (D.edges || []).forEach(function (e) { if (/dash/.test(e.cls || "")) u.dash = 1; });
+  return u;
+}
+function resolveNodes(D, X, errs) {
+  var N = {}, V = X.V;
+  Object.keys(D.nodes || {}).forEach(function (id) {
+    var r = D.nodes[id];
+    if (!X.vis(r)) return;
+    var n = { id: id, k: V(r.k), x: V(r.x), y: V(r.y), w: V(r.w) || 0, h: V(r.h) || 0,
+      t: V(r.t) || "", s: V(r.s) || "", n: V(r.n), ref: r.ref != null ? r.ref : V(r.n), chg: r.chg, al: r.al,
+      href: V(r.href), shape: r.shape, q: V(r.q), many: V(r.many), tp: V(r.tp), own: V(r.own), oc: V(r.oc), tip: V(r.tip) };
+    if (n.tip && !document.getElementById(n.tip)) { errs.push("узел " + id + ": tip — нет элемента #" + n.tip); n.tip = null; }
+    if (n.q) {
+      if (!QI[n.q]) { errs.push("узел " + id + ": неизвестный значок q=" + n.q); n.q = null; }
+      else if (!n.k) n.k = QI[n.q].k;
+      if (n.tp && !QTP[n.tp]) { errs.push("узел " + id + ": tp должен быть r, l, t, b, rt, rb, lt или lb"); n.tp = "r"; }
+    }
+    if ((n.own || n.oc) && !n.q) { errs.push("узел " + id + ": метка own бывает только у значка СМО (q)"); n.own = n.oc = null; }
+    if (n.oc && !OWN_OC[n.oc]) { errs.push("узел " + id + ": oc должен быть all"); n.oc = null; }
+    if (!(n.k in KINDS)) { errs.push("узел " + id + ": неизвестный вид k=" + n.k); n.k = "ext"; }
+    if (!num(n.x) || !num(n.y)) { errs.push("узел " + id + ": нет координат x, y"); n.x = n.x || 0; n.y = n.y || 0; }
+    n.tl = lines(n.t); n.sl = lines(n.s);
+    if (n.q) { n.w = n.w || QI[n.q].w; n.h = n.h || QI[n.q].h; }
+    else if (n.k === "init") { n.w = n.h = 18; }
+    else if (n.k === "final") { n.w = n.h = 24; }
+    else {
+      if (!n.w) n.w = n.k === "dec" ? 200 : 180;
+      if (n.k === "dec") n.h = n.h || 84;
+      else n.h = Math.max(n.h, boxContent(n) + 20 + (n.shape === "db" ? 10 : 0), 52);
+    }
+    N[id] = n;
+  });
+  return N;
+}
+function anchor(n, side, off) {
+  off = off || 0;
+  switch (side) {
+    case "t": return [n.x + off, n.y - n.h / 2];
+    case "b": return [n.x + off, n.y + n.h / 2];
+    case "l": return [n.x - n.w / 2, n.y + off];
+    default: return [n.x + n.w / 2, n.y + off];
+  }
+}
+function route(a, as, b, bs) {
+  var v1 = as === "t" || as === "b", v2 = bs === "t" || bs === "b";
+  if (v1 && v2) {
+    if (a[0] === b[0]) return [a, b];
+    var my = (a[1] + b[1]) / 2;
+    return [a, [a[0], my], [b[0], my], b];
+  }
+  if (!v1 && !v2) {
+    if (a[1] === b[1]) return [a, b];
+    var mx = (a[0] + b[0]) / 2;
+    return [a, [mx, a[1]], [mx, b[1]], b];
+  }
+  if (!v1) return [a, [b[0], a[1]], b];
+  return [a, [a[0], b[1]], b];
+}
+function labelPos(pts, near) {
+  var a, b;
+  if (near) {
+    a = pts[0]; b = pts[1];
+    var dx = Math.sign(b[0] - a[0]), dy = Math.sign(b[1] - a[1]);
+    if (dy) return { x: a[0] + 7, y: a[1] + dy * 16, anchor: "start" };
+    return { x: a[0] + dx * 10, y: a[1] - 12, anchor: dx > 0 ? "start" : "end", above: true };
+  }
+  var best = -1, bi = 0;
+  for (var i = 0; i < pts.length - 1; i++) {
+    var len = Math.abs(pts[i + 1][0] - pts[i][0]) + Math.abs(pts[i + 1][1] - pts[i][1]);
+    if (len > best) { best = len; bi = i; }
+  }
+  a = pts[bi]; b = pts[bi + 1];
+  if (a[0] === b[0]) return { x: a[0] + 7, y: (a[1] + b[1]) / 2, anchor: "start" };
+  return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 - 12, anchor: "middle", above: true };
+}
+function flowDraw(svg, D, X, errs) {
+  var V = X.V, vw = V(D.vw), vh = V(D.vh);
+  if (!num(vw) || !num(vh)) { errs.push("нужны числа vw и vh"); vw = vw || 800; vh = vh || 400; }
+  svg.setAttribute("viewBox", "0 0 " + vw + " " + vh);
+  svg.setAttribute("width", vw);
+  svg.setAttribute("height", vh);
+  markers(svg, D._mid);
+  var gb = el("g", {}, svg);
+  (D.lanes || []).forEach(function (l, i) {
+    if (!X.vis(l)) return;
+    if (!LANES[l.c]) errs.push("дорожка " + i + ": неизвестный цвет c=" + l.c);
+    el("rect", { x: l.x, y: l.y0, width: l.w, height: l.y1 - l.y0, rx: 10, "class": "lane-" + l.c }, gb);
+    if (l.left) txt(gb, l.x + 14, l.y0 + 20, V(l.t) || "", "lt lane-t-" + l.c, "start");
+    else txt(gb, l.x + l.w / 2, l.y0 + 20, V(l.t) || "", "lt lane-t-" + l.c);
+  });
+  (D.rows || []).forEach(function (r, i) {
+    if (!X.vis(r)) return;
+    if (!LANES[r.c]) errs.push("полоса " + i + ": неизвестный цвет c=" + r.c);
+    el("rect", { x: 8, y: r.y0, width: vw - 16, height: r.y1 - r.y0, rx: 10, "class": "lane-" + r.c }, gb);
+    var ls = lines(V(r.s)), yc = (r.y0 + r.y1) / 2, y0 = yc - (ls.length * LH) / 2 + 2;
+    txt(gb, 24, y0, V(r.t) || "", "lt lane-t-" + r.c, "start");
+    ls.forEach(function (ln, j) { txt(gb, 24, y0 + 16 + j * LH, ln, "ls", "start"); });
+  });
+  var N = resolveNodes(D, X, errs);
+  var ge = el("g", {}, svg), gn = el("g", {}, svg), gl = el("g", {}, svg), labels = [];
+  (D.edges || []).forEach(function (e, i) {
+    if (!X.vis(e)) return;
+    var nm = "ребро " + i + " (" + e.f + " → " + e.t + ")";
+    if (!D.nodes[e.f] || !D.nodes[e.t]) { errs.push(nm + ": нет узла " + (!D.nodes[e.f] ? e.f : e.t)); return; }
+    var a = N[e.f], b = N[e.t];
+    if (!a || !b) return;
+    var fs = V(e.fs) || "b", ts = V(e.ts) || "t";
+    if (!SIDES[fs] || !SIDES[ts]) { errs.push(nm + ": сторона должна быть t, b, l или r"); return; }
+    var p1 = anchor(a, fs, V(e.fo)), p2 = anchor(b, ts, V(e.to)), via = V(e.via);
+    var pts = e.straight ? [p1, p2] : via ? [p1].concat(via).concat([p2]) : route(p1, fs, p2, ts);
+    var cls = V(e.cls) || "";
+    edgePath(ge, D._mid, pts, cls, e.mk);
+    var lab = V(e.lab), lp = V(e.lp);
+    if (lab) labels.push([lp ? { x: lp[0], y: lp[1], anchor: lp[2] || "middle" } : labelPos(pts, a.k === "dec"), lab, labCls(cls)]);
+  });
+  var cnt = 0;
+  Object.keys(N).forEach(function (id) { drawBox(gn, N[id]); cnt++; });
+  labels.forEach(function (l) { drawLabel(gl, l[0], l[1], l[2]); });
+  return cnt;
+}
+
+/* ---------- WIKI.seq ---------- */
+function seqUsed(D, X) {
+  var u = {};
+  (D.parts || []).forEach(function (p) { X.all(p.k || "ext").forEach(function (k) { u[k] = 1; }); });
+  (D.msgs || []).forEach(function (m) {
+    X.all(m.cls || "").forEach(function (c) { if (/dash/.test(c)) u.dash = 1; if (/lost/.test(c)) u.lost = 1; });
+  });
+  (D.blocks || []).forEach(function (b) { if (b.k === "hw") u.hwblk = 1; });
+  return u;
+}
+function seqDraw(svg, D, X, errs) {
+  var V = X.V, colw = D.colw || 170, top = 10, P = {}, parts = [];
+  (D.parts || []).forEach(function (p, i) {
+    if (!X.vis(p)) return;
+    var o = { id: p.id, k: V(p.k) || "ext", t: V(p.t) || p.id, s: V(p.s) || "", ref: p.ref, href: V(p.href), shape: p.shape, chg: p.chg };
+    if (!(o.k in KINDS)) { errs.push("участник " + p.id + ": неизвестный вид k=" + o.k); o.k = "ext"; }
+    o.x = p.x != null ? p.x : (D.x0 || colw / 2 + 10) + parts.length * colw;
+    o.w = p.w || colw - 24;
+    o.tl = lines(o.t); o.sl = lines(o.s);
+    P[p.id] = o; parts.push(o);
+  });
+  var hh = 46;
+  parts.forEach(function (p) { hh = Math.max(hh, boxContent(p) + 20 + (p.shape === "db" ? 12 : 0)); });
+  parts.forEach(function (p) { p.h = hh; p.y = top + hh / 2; });
+
+  var notesAt = {};
+  (D.notes || []).forEach(function (nt) { if (X.vis(nt)) (notesAt[String(nt.at)] = notesAt[String(nt.at)] || []).push(nt); });
+  var rows = [], y = top + hh + 24, no = 0, blkStart = {};
+  /* подпись блока — своя строка над первым сообщением блока */
+  (D.blocks || []).forEach(function (bk) { if (bk.lab && X.vis(bk)) blkStart[String(bk.from)] = 1; });
+  function addNote(nt) {
+    var ls = lines(V(nt.text != null ? nt.text : nt.note)), h = ls.length * LH + 16;
+    rows.push({ type: "note", y: y, h: h, ls: ls, nt: nt });
+    y += h + 14;
+  }
+  (notesAt["0"] || []).forEach(addNote);
+  (D.msgs || []).forEach(function (m, i) {
+    if (!X.vis(m)) return;
+    if (m.sep != null) { rows.push({ type: "sep", y: y + 10, t: V(m.sep) }); y += 44; return; }
+    if (m.gap != null) { rows.push({ type: "gap", y: y + 8, t: V(m.gap) }); y += 40; return; }
+    if (m.note != null) { addNote(m); return; }
+    if (!P[m.f] || !P[m.t]) {
+      var miss = !P[m.f] ? m.f : m.t, known = (D.parts || []).some(function (p) { return p.id === miss; });
+      if (!known) errs.push("сообщение " + i + ": нет участника " + miss);
+      return;
+    }
+    var lab = V(m.lab) || "", ls = lines(lab), n = D.autonumber ? ++no : V(m.n), cls = V(m.cls) || "";
+    var padB = [m.id, n, m.ref].some(function (k) { return k != null && blkStart[String(k)]; });
+    if (padB) y += 14;
+    var r = { type: "msg", m: m, a: P[m.f], b: P[m.t], n: n, ref: m.ref != null ? m.ref : n, ls: ls, cls: cls, self: m.f === m.t, padB: padB };
+    /* петля «себе» у крайнего правого участника — слева, чтобы не расширять схему */
+    r.left = r.self && (m.side === "l" || (m.side == null && parts.length > 1 && P[m.f] === parts[parts.length - 1]));
+    if (r.self) { r.h = Math.max(26, ls.length * LH + 10); r.y = y + 4; r.y0 = r.y - 8; r.y1 = r.y + r.h + 8; y = r.y + r.h + 20; }
+    else { r.y = y + ls.length * LH + 8; r.y0 = y - 6; r.y1 = r.y + 10; y = r.y + 22; }
+    rows.push(r);
+    [m.id, n].forEach(function (k) { if (k != null && notesAt[String(k)]) { notesAt[String(k)].forEach(addNote); delete notesAt[String(k)]; } });
+  });
+  var H = y + 6;
+  /* ширина: последняя колонка и подписи сообщений «себе» и заметки справа, которые выходят за неё */
+  var right = Math.max.apply(null, parts.map(function (p) { return p.x + colw / 2; }).concat([0]));
+  rows.forEach(function (r) {
+    if (r.type === "msg" && r.self && !r.left) right = Math.max(right, r.a.x + 50 + Math.max.apply(null, r.ls.map(function (l) { return l.length; }).concat([0])) * 6.4);
+    if (r.type === "note" && r.nt.right != null && P[r.nt.right]) right = Math.max(right, P[r.nt.right].x + 18 + (r.nt.w || 230));
+  });
+  var vw = D.vw || Math.ceil(right + (D.padR || 10));
+  svg.setAttribute("viewBox", "0 0 " + vw + " " + H);
+  svg.setAttribute("width", vw);
+  svg.setAttribute("height", H);
+  markers(svg, D._mid);
+
+  function rowsOf(key) {
+    return rows.filter(function (r) {
+      return r.type === "msg" && (String(r.m.id) === String(key) || String(r.n) === String(key) || String(r.ref) === String(key));
+    });
+  }
+  var gb = el("g", {}, svg);
+  (D.blocks || []).forEach(function (bk, i) {
+    if (!X.vis(bk)) return;
+    var k = bk.k || "grp";
+    if (!BLOCKS[k]) errs.push("блок " + i + ": неизвестный вид k=" + k);
+    var r0 = rowsOf(bk.from)[0], rr = rowsOf(bk.to), r1 = rr[rr.length - 1];
+    if (!r0 || !r1) { if (!D.variants) errs.push("блок " + i + ": нет сообщения " + (!r0 ? bk.from : bk.to)); return; }
+    var i0 = rows.indexOf(r0), i1 = rows.indexOf(r1), lo = Infinity, hi = -Infinity;
+    for (var j = i0; j <= i1; j++) if (rows[j].type === "msg") {
+      lo = Math.min(lo, rows[j].a.x, rows[j].b.x); hi = Math.max(hi, rows[j].a.x, rows[j].b.x);
+      if (rows[j].self) {
+        var lw = Math.max.apply(null, rows[j].ls.map(function (l) { return l.length; }).concat([0])) * 6.4 + 52;
+        if (rows[j].left) lo = Math.min(lo, rows[j].a.x - lw + colw / 2 - 10); else hi = Math.max(hi, rows[j].a.x + lw - colw / 2 + 10);
+      }
+    }
+    var x0 = lo - colw / 2 + 10, x1 = hi + colw / 2 - 10;
+    var pad = bk.lab && r0.padB ? 14 : 0;
+    el("rect", { x: x0, y: r0.y0 - 6 - pad, width: x1 - x0, height: r1.y1 - r0.y0 + 10 + pad, rx: 8, "class": "blk blk-" + k }, gb);
+    if (bk.lab) txt(gb, x0 + 8, r0.y0 + 7 - pad, V(bk.lab), "blt blt-" + k, "start");
+  });
+  var gl = el("g", {}, svg);
+  parts.forEach(function (p) { el("line", { x1: p.x, y1: top + hh, x2: p.x, y2: H - 4, "class": "life" }, gl); });
+  var gh = el("g", {}, svg), cnt = 0;
+  parts.forEach(function (p) { drawBox(gh, p); cnt++; });
+
+  var gm = el("g", {}, svg);
+  rows.forEach(function (r) {
+    if (r.type === "sep") {
+      el("line", { x1: 8, y1: r.y, x2: vw - 8, y2: r.y, "class": "sepl" }, gm);
+      var t = txt(gm, vw / 2, r.y + 4, r.t, "sept");
+      var w = (t.getComputedTextLength && t.getComputedTextLength()) || r.t.length * 7;
+      var bx = el("rect", { x: vw / 2 - w / 2 - 12, y: r.y - 11, width: w + 24, height: 22, rx: 6, "class": "sepb" });
+      gm.insertBefore(bx, t);
+      return;
+    }
+    if (r.type === "gap") { txt(gm, vw / 2, r.y + 8, "… " + r.t + " …", "gapt"); return; }
+    if (r.type === "note") {
+      var nt = r.nt, x0, x1, anc = "middle";
+      var over = nt.over != null ? (Array.isArray(nt.over) ? nt.over : [nt.over]) : null;
+      if (over) {
+        var ox = over.map(function (id) { if (!P[id]) errs.push("заметка: нет участника " + id); return P[id] ? P[id].x : 0; });
+        var pad = over.length > 1 ? colw / 2 - 16 : (nt.w ? nt.w / 2 : 80);
+        x0 = Math.min.apply(null, ox) - pad; x1 = Math.max.apply(null, ox) + pad;
+      } else {
+        var side = nt.right != null ? "right" : "left", pid = nt.right != null ? nt.right : nt.left, px = P[pid] ? P[pid].x : 0;
+        if (!P[pid]) errs.push("заметка: нет участника " + pid);
+        var nw = nt.w || 230;
+        x0 = side === "right" ? px + 14 : px - 14 - nw; x1 = x0 + nw;
+      }
+      var g = el("g", { "class": "k-note" }, gm);
+      el("rect", { x: x0, y: r.y, width: x1 - x0, height: r.h, rx: 8, "class": "shape" }, g);
+      r.ls.forEach(function (ln, j) { txt(g, (x0 + x1) / 2, r.y + 8 + (j + 1) * LH - 2, ln, "s", anc); });
+      return;
+    }
+    var mg = el("g", { "class": "msg" }, gm), a = r.a, b = r.b, cls = r.cls;
+    var lc = labCls(cls), hwb = /hw/.test(cls);
+    if (r.self) {
+      var x = a.x, yy = r.y, sd = r.left ? -1 : 1;
+      edgePath(mg, D._mid, [[x, yy], [x + sd * 36, yy], [x + sd * 36, yy + r.h], [x + sd * 3, yy + r.h]], cls, /lost/.test(cls) ? "none" : null);
+      if (/lost/.test(cls)) xmark(mg, x + sd * 36, yy + r.h / 2);
+      var lx = x + sd * (/lost/.test(cls) ? 50 : 44);
+      r.ls.forEach(function (ln, j) { txt(mg, lx, yy + r.h / 2 + 4 - (r.ls.length - 1) * LH / 2 + j * LH, ln, "lab " + lc, r.left ? "end" : "start"); });
+      if (r.n != null) badge(mg, x + sd * 16, yy, r.n, hwb);
+    } else {
+      var dir = b.x > a.x ? 1 : -1, xe = b.x - dir * 2;
+      if (/lost/.test(cls)) xe = a.x + (b.x - a.x) * 0.8;
+      edgePath(mg, D._mid, [[a.x, r.y], [xe, r.y]], cls, /lost/.test(cls) ? "none" : null);
+      if (/lost/.test(cls)) xmark(mg, xe, r.y);
+      var mx = (a.x + (r.n != null ? dir * 26 : 0) + xe) / 2;
+      r.ls.forEach(function (ln, j) { txt(mg, mx, r.y - 13 - (r.ls.length - 1 - j) * LH, ln, "lab " + lc); });
+      if (r.n != null) badge(mg, a.x + dir * 16, r.y, r.n, hwb);
+    }
+    cnt++;
+  });
+  return cnt;
+}
+function xmark(g, x, y) { el("path", { d: "M" + (x - 6) + "," + (y - 6) + " L" + (x + 6) + "," + (y + 6) + " M" + (x - 6) + "," + (y + 6) + " L" + (x + 6) + "," + (y - 6), "class": "xm" }, g); }
+
+/* Окно описания узла. У узла flow поле tip — id элемента страницы, обычно пункта пояснений.
+   Клик по узлу показывает копию этого элемента под узлом; клик вне окна, повторный клик или Esc закрывают. */
+var pop = null, popW = 0;
+function closePop() { if (pop) { pop.parentNode.removeChild(pop); pop = null; } }
+function openPop(nd) {
+  var src = document.getElementById(nd.getAttribute("data-tip"));
+  if (!src) return;
+  pop = document.createElement("div");
+  pop.className = "ndpop";
+  pop.innerHTML = src.innerHTML;
+  pop._nd = nd;
+  popW = window.innerWidth;
+  document.body.appendChild(pop);
+  var r = nd.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  var x = Math.max(8, Math.min(r.left, document.documentElement.clientWidth - pw - 8)), y = r.bottom + 8;
+  if (y + ph > window.innerHeight - 8 && r.top - ph - 8 >= 8) y = r.top - ph - 8;
+  pop.style.left = (x + window.scrollX) + "px";
+  pop.style.top = (y + window.scrollY) + "px";
+}
+document.addEventListener("click", function (ev) {
+  if (pop && pop.contains(ev.target)) return;
+  var nd = ev.target.closest ? ev.target.closest(".dia .nd[data-tip]") : null, was = pop && pop._nd;
+  closePop();
+  if (nd && nd !== was) openPop(nd);
+});
+document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") closePop(); });
+window.addEventListener("resize", function () { if (window.innerWidth !== popW) closePop(); });
+
+W.flow = function (svgId, D) { setup(svgId, D, "flow", flowDraw, flowUsed); };
+W.seq = function (svgId, D) { setup(svgId, D, "seq", seqDraw, seqUsed); };
+
+/* Поле поиска в верхней панели: / или Ctrl+K ставят в него курсор; Enter открывает результаты на главной. */
+/* В окне просмотра index.html страница сообщает главной свой адрес, а / и Ctrl+K отдаёт её полю поиска. */
+var framed = window.parent !== window;
+function tellParent(m) { try { window.parent.postMessage(m, "*"); } catch (e) {} }
+if (framed) {
+  tellParent({ wiki: "page", href: location.href });
+  window.addEventListener("hashchange", function () { tellParent({ wiki: "page", href: location.href }); });
+}
+document.addEventListener("keydown", function (ev) {
+  var q = document.querySelector(".top .ix-search input"), key = (ev.key || "").toLowerCase();
+  var inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (!((key === "/" && !inField) || (key === "k" && (ev.ctrlKey || ev.metaKey)))) return;
+  ev.preventDefault();
+  if (framed) tellParent({ wiki: "search" });
+  else if (q) { q.focus(); q.select(); }
+});
+
+})();
+</script>
+<script>
+/* ---------- Схемы страницы ---------- */
+WIKI.flow("svg-ex1", {
+  vw: 760, vh: 560,
+  lanes: [
+    { x: 8, w: 470, y0: 6, y1: 548, c: "core", t: "Программа" },
+    { x: 488, w: 264, y0: 6, y1: 548, c: "hw", t: "Железо" }
+  ],
+  nodes: {
+    INI: { k: "init", x: 240, y: 46 },
+    RECV: { k: "drv", n: 1, x: 240, y: 110, w: 240, t: "Команда пришла", s: "драйвер принимает её\nи передаёт дальше" },
+    HBA: { k: "hw", ref: 1, x: 620, y: 110, w: 200, t: "HBA", s: "кольцо, MSI-X", href: "LUN (Logical Unit Number)" },
+    REG: { k: "core", n: 2, chg: 1, x: 240, y: 215, w: 240, t: "Регистрация", s: "берёт команду на учёт" },
+    D_OK: { k: "dec", ref: 2, x: 240, y: 320, w: 200, h: 84, t: "Можно\nвыполнять?" },
+    REJ: { k: "err", n: 3, x: 620, y: 320, w: 200, t: "Отказ", s: "ответ с ошибкой" },
+    DISK: { k: "disk", n: 4, x: 240, y: 430, w: 240, t: "Работа диска", s: "запрос к бэкенду" },
+    NVME: { k: "hw", ref: 4, shape: "db", x: 620, y: 430, w: 180, t: "NVMe", s: "DMA из страниц" },
+    FIN: { k: "final", x: 240, y: 515 }
+  },
+  edges: [
+    { f: "INI", t: "RECV" },
+    { f: "HBA", fs: "l", t: "RECV", ts: "r", lab: "прерывание", cls: "hw" },
+    { f: "RECV", t: "REG" },
+    { f: "REG", t: "D_OK" },
+    { f: "D_OK", fs: "r", t: "REJ", ts: "l", lab: "нет", cls: "err" },
+    { f: "D_OK", t: "DISK", lab: "да" },
+    { f: "DISK", fs: "r", t: "NVME", ts: "l", lab: "bio", cls: "dash" },
+    { f: "DISK", t: "FIN" }
+  ]
+});
+
+WIKI.seq("svg-ex2", {
+  colw: 190,
+  variants: [{ id: "ok", t: "Успех" }, { id: "fail", t: "Сбой" }],
+  vlabel: "Сценарий",
+  parts: [
+    { id: "I", t: "Хост", s: "инициатор", k: "ext" },
+    { id: "H", t: "HBA", s: "firmware", k: "hw" },
+    { id: "D", t: "Драйвер", k: "drv" },
+    { id: "C", t: "Ядро", k: "core" },
+    { id: "B", t: "Диск", k: "disk", shape: "db" }
+  ],
+  msgs: [
+    { sep: "Приём" },
+    { f: "I", t: "H", lab: "FCP_CMND", n: 1, cls: "hw" },
+    { f: "H", t: "D", lab: "запись в кольцо,\nMSI-X", n: 2, cls: "hw" },
+    { f: "D", t: "D", lab: "разбор записи", n: 3 },
+    { f: "D", t: "C", lab: "scst_rx_cmd", n: 4 },
+    { gap: "команда в очереди" },
+    { f: "C", t: "B", lab: { ok: "submit_bio", fail: "submit_bio" }, n: 5 },
+    { f: "B", t: "C", lab: "завершение", cls: "dash", ref: 5, only: "ok" },
+    { f: "B", t: "C", lab: "ошибка ввода-вывода", cls: "err", ref: 5, only: "fail" },
+    { f: "C", t: "I", lab: "ответ хосту", n: 6, cls: "lost", only: "fail" },
+    { f: "C", t: "D", lab: "xmit_response", n: 6, only: "ok" }
+  ],
+  blocks: [{ from: 1, to: 2, lab: "⚙ железо", k: "hw" }],
+  notes: [{ at: 4, over: ["D", "C"], text: "Дальше команда идёт по состояниям ядра" }]
+});
+
+WIKI.flow("svg-ex3", {
+  vw: 840, vh: 380,
+  nodes: {
+    INI: { k: "init", x: 190, y: 28 },
+    WORK: { k: "thr", n: 1, x: 190, y: 150, w: 240, t: "Работа", s: "берёт команды из очередей" },
+    POLL: { k: "thr", n: 2, x: 650, y: 150, w: 260, t: "Опрос", s: "до 200 мкс ждёт новую команду" },
+    SLEEP: { k: "thr", n: 3, x: 430, y: 320, w: 220, t: "Сон", s: "процессор свободен" }
+  },
+  edges: [
+    { f: "INI", t: "WORK", lab: "поток создан" },
+    { f: "WORK", fs: "r", fo: -12, t: "POLL", ts: "l", to: -12, lab: "очередь опустела" },
+    { f: "POLL", fs: "l", fo: 12, t: "WORK", ts: "r", to: 12, lab: "пришла команда", lp: [415, 186] },
+    { f: "POLL", fs: "b", t: "SLEEP", ts: "r", lab: "время вышло", lp: [658, 250, "start"] },
+    { f: "SLEEP", fs: "l", t: "WORK", ts: "b", lab: "поток будят", lp: [182, 270, "end"], cls: "dash" }
+  ]
+});
+</script>
+</body>
+</html>

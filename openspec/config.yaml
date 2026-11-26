@@ -6,22 +6,16 @@ context: |
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
   Terms come strictly from GLOSSARY.md; no synonyms.
   Decisions and their reasons live in docs/adr/; specs describe behaviour only.
+  Create one OpenSpec change per feature issue introducing, modifying or removing behaviour.
+  A bug restores specified behaviour with a regression test and a fix.
+  Chore, documentation and research issues follow their own routes in CONTRIBUTING.md.
+  Organize work spanning multiple PRs as an epic. Create changes for its feature sub-issues.
 
 rules:
   proposal:
     - "The first line is `Issue: #<number>` — the GitHub issue this change comes from (docs/agents/issue-tracker.md). If the user gave no issue number, ask for it before writing."
+  design:
+    - Record architectural decisions meeting the ADR criteria in CONTRIBUTING.md in docs/adr/ in the same PR. Reference the ADR from design.md.
   tasks:
     - Spikes and prototypes are the first tasks; each says which tasks it blocks.
     - Every task is executable by an agent without the user's participation.
-
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
