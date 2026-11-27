@@ -1,4 +1,5 @@
 import os
+import re
 from unittest.mock import patch
 from urllib.parse import quote
 
@@ -141,6 +142,8 @@ class CommandTest(WikiCase):
         source = self.index.read_text().replace("<title>База знаний</title>", "<title>Моя база</title>")
         source = source.replace('<script id="wiki-navigation">', '<script>').replace(
             'function treeRows(pages)', 'function oldTreeRows(pages)')
+        old_menu = '<div id="note-menu" popover><button id="menu-rename">Переименовать</button></div>'
+        source = re.sub(r'<div id="note-menu" popover>.*?</div>', old_menu, source, flags=re.S)
         blocks = (("style", "wiki-sidebar-css"), ("script", "wiki-sidebar"))
         for tag, ident in blocks:
             existing = wiki.block(source, tag, ident)
@@ -152,6 +155,7 @@ class CommandTest(WikiCase):
         for tag, ident in blocks:
             self.assertIsNotNone(wiki.block(updated, tag, ident), ident)
         self.assertIn("<title>Моя база</title>", updated)
+        self.assertEqual(updated.count('id="menu-move"'), 1)
         self.assertEqual(updated.count("function treeRows(pages)"), 1)
         self.assertNotIn("function oldTreeRows", updated)
         for ident in ("wiki-index", "wiki-sections"):

@@ -421,6 +421,10 @@ pre.wg-code .c { color: var(--muted); }
 #note-menu button:is(:hover, :focus-visible) { background: var(--accent-soft); }
 </style>
 <style id="wiki-sidebar-css">
+#note-menu { max-width: 95vw; max-height: 80vh; overflow: auto; }
+#move-folders button:disabled { color: var(--muted); cursor: default; }
+#move-folders button:disabled::before { content: "✓ "; }
+.ix-list .drop-folder { outline: 2px solid var(--accent); outline-offset: -2px; }
 .ix-list details > summary, .ix-folder-result {
   cursor: pointer;
   padding: 4px 10px;
@@ -459,8 +463,12 @@ body.ix-app:not(.collapsed) { grid-template-columns: var(--sidebar-width, 320px)
   <button id="delete-note" type="button" hidden>Удалить заметку</button>
 </aside>
 <div id="note-menu" popover>
-  <button id="menu-rename" type="button">Переименовать</button>
-  <button id="menu-delete" type="button">Удалить заметку</button>
+  <section id="note-actions">
+    <button id="menu-rename" type="button">Переименовать</button>
+    <button id="menu-move" type="button" aria-controls="move-folders">Добавить в</button>
+    <button id="menu-delete" type="button">Удалить заметку</button>
+  </section>
+  <section id="move-folders" aria-label="Добавить в папку" hidden></section>
 </div>
 
 <main class="ix-view">
@@ -501,7 +509,7 @@ var expanded = new Set();
 /* Как в Obsidian: цифры, латиница, затем кириллица. */
 function cmpTitle(a, b) { return a.title.localeCompare(b.title, "en", { sensitivity: "base", numeric: true }); }
 function plural(n, a, b, c) { var m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; }
-function item(p, inner) { return '<a class="ix-t" href="' + url(p) + '" target="view" data-file="' + esc(p.file) + '">' + (inner || esc(p.title)) + "</a>"; }
+function item(p, inner) { return '<a class="ix-t" draggable="true" href="' + url(p) + '" target="view" data-file="' + esc(p.file) + '">' + (inner || esc(p.title)) + "</a>"; }
 
 /* ---------- Подготовка данных для поиска ---------- */
 PAGES.forEach(function (p) {
@@ -698,15 +706,20 @@ $("list").addEventListener("click", function (ev) {
 });
 var noteMenu = $("note-menu");
 
+function positionMenu(x, y) {
+  noteMenu.style.left = Math.max(0, Math.min(x, innerWidth - noteMenu.offsetWidth)) + "px";
+  noteMenu.style.top = Math.max(0, Math.min(y, innerHeight - noteMenu.offsetHeight)) + "px";
+}
 function showNoteMenu(ev) {
-  var row = ev.target.closest("li");
+  var row = ev.target.closest("li.res") || ev.target.closest("li");
   var link = row && row.querySelector(":scope > a[data-file]");
   if (!link || !noteMenu.showPopover || $("delete-note").disabled) return;
   ev.preventDefault();
   noteMenu.dataset.file = link.dataset.file;
+  $("note-actions").hidden = false;
+  $("move-folders").hidden = true;
   noteMenu.showPopover();
-  noteMenu.style.left = Math.max(0, Math.min(ev.clientX, innerWidth - noteMenu.offsetWidth)) + "px";
-  noteMenu.style.top = Math.max(0, Math.min(ev.clientY, innerHeight - noteMenu.offsetHeight)) + "px";
+  positionMenu(ev.clientX, ev.clientY);
   $("menu-rename").focus({ preventScroll: true });
 }
 $("list").addEventListener("contextmenu", showNoteMenu);
@@ -717,6 +730,93 @@ function closeNoteMenu() {
 $("list").addEventListener("scroll", closeNoteMenu);
 window.addEventListener("blur", closeNoteMenu);
 window.addEventListener("resize", closeNoteMenu);
+function reloadChangedPage(page, result) {
+  if (current === page.file) shown = url(result) + shown.slice(shown.split("#")[0].length);
+  saveHash();
+  location.reload();
+}
+async function moveNote(page, folder) {
+  closeNoteMenu();
+  if (!page || $("delete-note").disabled || folder === parentFolder(page.file)) return;
+  if (location.protocol !== "http:" || location.hostname !== "127.0.0.1") {
+    alert("Для перемещения откройте Wisp на локальном сервере.");
+    return;
+  }
+  $("delete-note").disabled = true;
+  try {
+    var response = await fetch("/notes/" + url(page), {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({folder: folder})
+    });
+    if (response.status === 409) { alert("В этой папке уже есть файл с таким именем."); return; }
+    if (response.status === 404) { alert("Заметка или папка больше не существует."); return; }
+    if (!response.ok) throw new Error();
+    reloadChangedPage(page, await response.json());
+  } catch (err) {
+    alert("Не удалось переместить заметку. Проверьте соединение с Wisp.");
+  } finally {
+    $("delete-note").disabled = false;
+  }
+}
+$("menu-move").addEventListener("click", function () {
+  var list = $("move-folders"), currentFolder = parentFolder(noteMenu.dataset.file);
+  list.replaceChildren();
+  [""].concat(folders).forEach(function (folder) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.textContent = folder || "Корень базы";
+    button.disabled = folder === currentFolder;
+    button.addEventListener("click", function () { moveNote(pageByFile(noteMenu.dataset.file), folder); });
+    list.appendChild(button);
+  });
+  $("note-actions").hidden = true;
+  list.hidden = false;
+  positionMenu(noteMenu.offsetLeft, noteMenu.offsetTop);
+  var firstFolder = list.querySelector("button:enabled");
+  if (firstFolder) firstFolder.focus();
+});
+
+var dragged = null, highlighted = null;
+function highlightFolder(row) {
+  if (row === highlighted) return;
+  if (highlighted) highlighted.classList.remove("drop-folder");
+  highlighted = row;
+  if (row) row.classList.add("drop-folder");
+}
+function endDrag() { dragged = null; highlightFolder(null); }
+function dropRow(ev) {
+  return dragged && ev.target.closest("details[data-folder] > summary, button.ix-folder-result");
+}
+[$("list"), $("recent")].forEach(function (list) {
+  list.addEventListener("dragstart", function (ev) {
+    var link = ev.target.closest("a[data-file]");
+    dragged = link && pageByFile(link.dataset.file);
+    if (dragged) {
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.clearData();
+      ev.dataTransfer.setData("application/x-wisp-note", dragged.file);
+    }
+  });
+  list.addEventListener("dragend", endDrag);
+});
+function acceptFolder(ev) {
+  var row = dropRow(ev);
+  highlightFolder(row);
+  if (row) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; }
+}
+$("list").addEventListener("dragenter", acceptFolder);
+$("list").addEventListener("dragover", acceptFolder);
+$("list").addEventListener("dragleave", function (ev) {
+  if (highlighted && !highlighted.contains(ev.relatedTarget)) highlightFolder(null);
+});
+$("list").addEventListener("drop", function (ev) {
+  var row = dropRow(ev);
+  if (row && ev.dataTransfer.getData("application/x-wisp-note") === dragged.file) {
+    ev.preventDefault();
+    moveNote(dragged, row.closest("[data-folder]").dataset.folder);
+  }
+  endDrag();
+});
 $("menu-rename").addEventListener("click", async function () {
   var page = pageByFile(noteMenu.dataset.file);
   closeNoteMenu();
@@ -742,10 +842,7 @@ $("menu-rename").addEventListener("click", async function () {
       return;
     }
     if (!response.ok) throw new Error();
-    var result = await response.json();
-    if (current === page.file) shown = url(result) + shown.slice(shown.split("#")[0].length);
-    saveHash();
-    location.reload();
+    reloadChangedPage(page, await response.json());
   } catch (err) {
     alert("Не удалось переименовать заметку. Проверьте соединение с Wisp.");
   } finally {

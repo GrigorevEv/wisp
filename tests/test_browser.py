@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 import unittest
+from contextlib import asynccontextmanager
 from urllib.parse import quote
 
 from scripts import wiki_html as wiki
@@ -58,44 +59,52 @@ if (divider) {
         self.assertEqual((collapsed, visible_dividers, reopened), (46, 0, adjusted))
         self.assertIn(f'data-widths="{adjusted}"', self.index_dom("", profile=profile))
 
+    @asynccontextmanager
+    async def browser(self, address):
+        # Chrome принимает команды DevTools через дескриптор 3 и отвечает через 4.
+        chrome = await asyncio.create_subprocess_exec(
+            "sh", "-c", 'exec "$@" 3<&0 4>&1 </dev/null >/dev/null', "chrome",
+            wiki.chrome_bin(), "--headless=new", "--disable-gpu", "--remote-debugging-pipe",
+            "--user-data-dir=" + str(self.root / "chrome"), "--window-size=1200,800",
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        session = None
+
+        async def command(method, **params):
+            request = {"id": 1, "method": method, "params": params}
+            if session:
+                request["sessionId"] = session
+            chrome.stdin.write(json.dumps(request).encode() + b"\0")
+            await chrome.stdin.drain()
+            while True:
+                packet = await chrome.stdout.readuntil(b"\0")
+                reply = json.loads(packet[:-1])
+                if "id" in reply:
+                    self.assertNotIn("error", reply)
+                    return reply["result"]
+
+        async def evaluate(expression):
+            result = await command("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True)
+            self.assertNotIn("exceptionDetails", result)
+            return result["result"].get("value")
+
+        try:
+            target = await command("Target.createTarget", url="about:blank")
+            attached = await command("Target.attachToTarget", targetId=target["targetId"], flatten=True)
+            session = attached["sessionId"]
+            await command("Page.navigate", url=address)
+            await evaluate('document.readyState === "complete" || new Promise(r => window.addEventListener("load", () => r(true)))')
+            yield command, evaluate
+        finally:
+            chrome.terminate()
+            await chrome.wait()
+
     @unittest.skipUnless(os.name == "posix", "для канала ввода Chrome нужна POSIX-оболочка")
     def test_drag_sidebar_over_an_open_note(self):
         note = self.create("Проверка")
         self.cli("index")
 
         async def drag_over_note():
-            # Chrome принимает команды DevTools через дескриптор 3 и отвечает через 4.
-            chrome = await asyncio.create_subprocess_exec(
-                "sh", "-c", 'exec "$@" 3<&0 4>&1 </dev/null >/dev/null', "chrome",
-                wiki.chrome_bin(), "--headless=new", "--disable-gpu", "--remote-debugging-pipe",
-                "--user-data-dir=" + str(self.root / "chrome"), "--window-size=1200,800",
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            session = None
-
-            async def command(method, **params):
-                request = {"id": 1, "method": method, "params": params}
-                if session:
-                    request["sessionId"] = session
-                chrome.stdin.write(json.dumps(request).encode() + b"\0")
-                await chrome.stdin.drain()
-                while True:
-                    packet = await chrome.stdout.readuntil(b"\0")
-                    reply = json.loads(packet[:-1])
-                    if "id" in reply:
-                        self.assertNotIn("error", reply)
-                        return reply["result"]
-
-            async def evaluate(expression):
-                result = await command("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True)
-                self.assertNotIn("exceptionDetails", result)
-                return result["result"].get("value")
-
-            try:
-                target = await command("Target.createTarget", url="about:blank")
-                attached = await command("Target.attachToTarget", targetId=target["targetId"], flatten=True)
-                session = attached["sessionId"]
-                await command("Page.navigate", url=self.index.as_uri() + "#p=" + note.name)
-                await evaluate('document.readyState === "complete" || new Promise(r => window.addEventListener("load", () => r(true)))')
+            async with self.browser(self.index.as_uri() + "#p=" + note.name) as (command, evaluate):
                 width = 'document.getElementById("side").offsetWidth'
                 start = await evaluate(width)
                 self.assertEqual(await evaluate(f"document.elementFromPoint({start + 180}, 150).tagName"), "IFRAME")
@@ -107,11 +116,112 @@ if (divider) {
                 await command("Input.dispatchMouseEvent", type="mouseMoved", x=start + 180, y=150)
                 self.assertEqual(await evaluate(width), start - 40)
                 self.assertEqual(await evaluate(f"document.elementFromPoint({start + 180}, 150).tagName"), "IFRAME")
-            finally:
-                chrome.terminate()
-                await chrome.wait()
-
         asyncio.run(asyncio.wait_for(drag_over_note(), timeout=30))
+
+    async def wait_for_file(self, evaluate, file):
+        selector = json.dumps('#list a[data-file="' + file + '"]')
+        for _ in range(100):
+            if await evaluate(f"document.readyState === 'complete' && document.querySelectorAll({selector}).length === 1"):
+                self.assertTrue((self.html / file).is_file())
+                return
+            await asyncio.sleep(.05)
+        state = await evaluate("""[location.hash, document.activeElement.outerHTML.slice(0, 200),
+            document.body.dataset.error, Array.from(document.querySelectorAll('#list a[data-file]'), a => a.dataset.file)]""")
+        self.fail(f"В списке не появилась заметка {file}: {state}")
+
+    @unittest.skipUnless(os.name == "posix", "для канала ввода Chrome нужна POSIX-оболочка")
+    def test_move_from_search_menu_keeps_open_heading(self):
+        note = self.create("Шина")
+        folder = "hardware/Шины #1"
+        destination = self.html / folder / note.name
+        destination.parent.mkdir(parents=True)
+        self.cli("index")
+        anchor = quote("пример")
+        query = "#q=" + quote("Шина") + "&p=" + quote(note.name + "#" + anchor)
+
+        async def use_menu(base):
+            async with self.browser(base + "/" + query) as (command, evaluate):
+                async def folders():
+                    await evaluate("""document.querySelector('#list a[data-file]').dispatchEvent(
+                        new MouseEvent('contextmenu', {bubbles:true})); document.querySelector('#menu-move').click()""")
+                    return await evaluate("Array.from(document.querySelectorAll('#move-folders button'), b => b.textContent)")
+
+                self.assertEqual(await folders(), ["Корень базы", "hardware", folder])
+                self.assertTrue(await evaluate("document.querySelector('#move-folders button').disabled"))
+                await command("Input.dispatchKeyEvent", type="keyDown", key="Escape", windowsVirtualKeyCode=27)
+                await command("Input.dispatchKeyEvent", type="keyUp", key="Escape", windowsVirtualKeyCode=27)
+                self.assertFalse(await evaluate("document.querySelector('#note-menu').matches(':popover-open')"))
+                await folders()
+                dest_button = "document.querySelector('#move-folders button:last-child')"
+                destination.write_bytes(note.read_bytes())
+                await evaluate("window.alert = msg => document.body.dataset.error = msg")
+                await evaluate(dest_button + ".click()")
+                error = await evaluate("""new Promise(resolve => {
+                    function check() { document.body.dataset.error ? resolve(document.body.dataset.error) : setTimeout(check, 20); }
+                    check();
+                })""")
+                self.assertIn("уже есть", error)
+                destination.unlink()
+                await folders()
+                await evaluate(dest_button + ".focus()")
+                await command("Input.dispatchKeyEvent", type="keyDown", key="Enter", code="Enter", text="\r", windowsVirtualKeyCode=13)
+                await command("Input.dispatchKeyEvent", type="keyUp", key="Enter", windowsVirtualKeyCode=13)
+                moved = folder + "/" + note.name
+                await self.wait_for_file(evaluate, moved)
+                self.assertFalse(note.exists())
+                self.assertEqual(await evaluate("document.querySelector('#q').value"), "Шина")
+                expected = quote(moved) + "#" + anchor
+                self.assertEqual(await evaluate("new URLSearchParams(location.hash.slice(1)).get('p')"), expected)
+                self.assertEqual(await evaluate("document.querySelector('#view').contentWindow.location.href"), base + "/" + expected)
+                await folders()
+                await evaluate("document.querySelector('#move-folders button').click()")
+                await self.wait_for_file(evaluate, note.name)
+                self.assertFalse(destination.exists())
+        with self.server() as base:
+            asyncio.run(asyncio.wait_for(use_menu(base), timeout=30))
+        self.cli("check", "--html-only")
+
+    @unittest.skipUnless(os.name == "posix", "для канала ввода Chrome нужна POSIX-оболочка")
+    def test_drag_note_to_closed_empty_and_nested_folders(self):
+        note = self.create("Шина")
+        (self.html / "hardware").mkdir()
+        (self.html / "parts/cpu").mkdir(parents=True)
+        self.cli("index")
+
+        async def drag(base):
+            async with self.browser(base + "/") as (command, evaluate):
+                async def drop(selector, source="#list a[data-file]"):
+                    async def center(css):
+                        return await evaluate("""(() => {
+                            const rect = document.querySelector(%s).getBoundingClientRect();
+                            return [rect.x + rect.width / 2, rect.y + rect.height / 2];
+                        })()""" % json.dumps(css))
+                    x, y = await center(source)
+                    dest_x, dest_y = await center(selector)
+                    await command("Input.dispatchMouseEvent", type="mousePressed", x=x, y=y, button="left", buttons=1)
+                    for step in range(1, 11):
+                        await command("Input.dispatchMouseEvent", type="mouseMoved", x=x + (dest_x - x) * step / 10,
+                                      y=y + (dest_y - y) * step / 10, button="left", buttons=1)
+                    await command("Input.dispatchMouseEvent", type="mouseMoved", x=dest_x, y=dest_y, button="left", buttons=1)
+                    highlighted = await evaluate("!!document.querySelector('.drop-folder')")
+                    await command("Input.dispatchMouseEvent", type="mouseReleased", x=dest_x, y=dest_y, button="left")
+                    return highlighted
+
+                self.assertFalse(await drop("#stats"))
+                self.assertTrue(note.exists())
+                self.assertTrue(await drop('details[data-folder="hardware"]:not([open]) > summary', "#recent a[data-file]"))
+                await self.wait_for_file(evaluate, "hardware/" + note.name)
+                self.assertFalse(note.exists())
+                await evaluate("""document.querySelector('[data-folder="hardware"] > summary').click();
+                    document.querySelector('[data-folder="parts"] > summary').click()""")
+                self.assertTrue(await drop('[data-folder="parts/cpu"] > summary'))
+                await self.wait_for_file(evaluate, "parts/cpu/" + note.name)
+                self.assertFalse((self.html / "hardware" / note.name).exists())
+                await evaluate("document.querySelector('#list a[data-file]').click()")
+                self.assertEqual(await evaluate("document.title"), "Шина — База знаний")
+        with self.server() as base:
+            asyncio.run(asyncio.wait_for(drag(base), timeout=30))
+        self.cli("check", "--html-only")
 
     def test_known_and_stale_bookmarks(self):
         self.create("Тема")
