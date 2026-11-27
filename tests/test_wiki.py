@@ -59,7 +59,8 @@ class WikiTest(WikiCase):
 
     def test_failed_publication_restores_every_file(self):
         target, _ = self.linked_notes()
-        before = {p.name: p.read_bytes() for p in self.html.iterdir()}
+        (self.html / "hardware").mkdir()
+        before = {p: p.read_bytes() for p in self.html.rglob("*.html")}
         replace = Path.replace
 
         def interrupt(path, destination):
@@ -68,9 +69,10 @@ class WikiTest(WikiCase):
             return replace(path, destination)
 
         with patch.multiple(wiki, HTML_DIR=self.html, INDEX=self.index), patch.object(Path, "replace", interrupt):
-            with self.assertRaises(OSError):
-                wiki.change_note(target, "Другое")
-        self.assertEqual(before, {p.name: p.read_bytes() for p in self.html.iterdir()})
+            for change in ({"title": "Другое"}, {"folder": "hardware"}):
+                with self.subTest(change=change), self.assertRaises(OSError):
+                    wiki.change_note(target, **change)
+                self.assertEqual(before, {p: p.read_bytes() for p in self.html.rglob("*.html")})
 
     def test_check_compares_search_data_and_keeps_good_index(self):
         target = self.create("Тема")

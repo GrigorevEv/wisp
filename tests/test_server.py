@@ -8,6 +8,62 @@ from tests.wiki_case import WikiCase
 
 
 class ServerTest(WikiCase):
+    def test_move_preserves_links_metadata_and_index(self):
+        target = self.create("Шина")
+        ref = self.create("Обзор")
+        sibling = "hardware/Шины #1"
+        for folder in ("hardware/cpu", sibling):
+            (self.html / folder).mkdir(parents=True)
+        for path, name, href in ((target, "Обзор", ref.name), (ref, "Шина", target.name)):
+            link = f'<a class="wl" href="{href}?theme=dark#пример">{name}</a>'
+            if path == ref:
+                link += f'<a href="/{href}">Шина</a>'
+            source = path.read_text().replace("</h1>", "</h1>" + link)
+            path.write_text(source.replace("</body>", '<script>const node = {href: "' + name + '"};</script></body>'))
+        self.cli("links")
+        self.cli("index")
+        meta = wiki.get_json(target.read_text(), "wiki-meta")
+        stamp = target.stat().st_mtime_ns
+        old = target
+        with self.server() as base:
+            for folder in ("hardware/cpu", sibling, ""):
+                with self.subTest(folder=folder):
+                    new = self.html / folder / target.name
+                    key = new.relative_to(self.html).as_posix()
+                    status, payload = self.request(base, "PATCH", quote(old.relative_to(self.html).as_posix()), folder=folder)
+                    self.assertEqual(status, 200)
+                    self.assertEqual(json.loads(payload), {"file": key})
+                    self.assertFalse(old.exists())
+                    self.assertEqual(new.stat().st_mtime_ns, stamp)
+                    source = new.read_text()
+                    self.assertEqual(wiki.get_json(source, "wiki-meta"), meta)
+                    for path, name, dest in ((new, "Обзор", ref), (ref, "Шина", new)):
+                        href = wiki.relative_href(dest, path.parent)
+                        self.assertIn(f'href="{href}?theme=dark#пример"', path.read_text())
+                        self.assertEqual(wiki.get_json(path.read_text(), "wiki-tips"), {name: href})
+                    self.assertIn(f'href="/{quote(key)}"', ref.read_text())
+                    home = wiki.relative_href(self.index, new.parent)
+                    for attr in ("href", "action"):
+                        self.assertIn(f'{attr}="{home}"', source)
+                    entries = wiki.get_json(self.index.read_text(), "wiki-index")
+                    self.assertEqual([e["file"] for e in entries if e["title"] == "Шина"], [key])
+                    self.cli("check", "--html-only")
+                    old = new
+
+    def test_move_errors_and_current_folder_preserve_files(self):
+        page = self.create("Шина")
+        folder = self.html / "hardware"
+        folder.mkdir()
+        occupied = folder / page.name
+        self.cli("index")
+        occupied.write_text("Занято")
+        before = [p.read_bytes() for p in (page, self.index, occupied)]
+        with self.server() as base:
+            for dest, expected in (("", 200), ("hardware", 409), ("missing", 404), ("../", 400), (False, 400)):
+                with self.subTest(dest=dest):
+                    self.assertEqual(self.request(base, "PATCH", page.name, folder=dest)[0], expected)
+        self.assertEqual([p.read_bytes() for p in (page, self.index, occupied)], before)
+
     def test_serves_index_and_notes_with_query_strings(self):
         page = self.create("Заметка")
         self.cli("index")

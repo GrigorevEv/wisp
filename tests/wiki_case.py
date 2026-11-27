@@ -49,8 +49,9 @@ class WikiCase(unittest.TestCase):
             finally:
                 process.terminate()
 
-    def request(self, base, method, filename, title=None, *, origin=True):
-        payload = json.dumps({"title": title}).encode() if title is not None else None
+    def request(self, base, method, filename, title=None, *, folder=None, origin=True):
+        data = {"folder": folder} if folder is not None else {"title": title}
+        payload = json.dumps(data).encode() if folder is not None or title is not None else None
         headers = {"Content-Type": "application/json"}
         if origin:
             headers["Origin"] = base

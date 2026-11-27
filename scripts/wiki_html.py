@@ -40,6 +40,7 @@ import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
+from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote
@@ -378,7 +379,7 @@ def frontmatter(text):
 
 def block(text, tag, ident):
     """Найти <tag id="ident">…</tag> (для script/style с типом тоже)."""
-    m = re.search(r'<%s(?: type="application/json")? id="%s">(.*?)</%s>' % (tag, re.escape(ident), tag), text, re.S)
+    m = re.search(r'<%s(?: type="application/json")? id="%s"[^>]*>(.*?)</%s>' % (tag, re.escape(ident), tag), text, re.S)
     return m
 
 
@@ -965,6 +966,7 @@ def sync_index_navigation(source):
                                 '<script id="wiki-navigation">\n(function () {\n"use strict";\nfunction $(id)', 1)
     source = source.replace("Поиск ищет внутри открытой вкладки.", "Поиск охватывает все папки, заметки и разделы.")
     for tag, ident, closing in (("style", "wiki-sidebar-css", "</head>"),
+                                ("div", "note-menu", "<main"),
                                 ("script", "wiki-navigation", "</body>"), ("script", "wiki-sidebar", "</body>")):
         new = block(template, tag, ident)
         if not new:
@@ -1419,24 +1421,65 @@ def cmd_check(args):
     return 1 if errors else 0
 
 
-def change_note(page, title=None):
-    """Переименовать или удалить заметку вместе с её связями и поисковым индексом."""
-    index = read(INDEX)
-    entries = get_json(index, "wiki-index")
-    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
-        raise ValueError("Не удалось прочитать индекс заметок.")
-    old_title = page_meta(page, read(page))["title"]
-    if not any(e.get("file") == page_key(page) and e.get("title") == old_title for e in entries):
-        raise ValueError("Индекс заметок устарел.")
-    target = page.with_name(page_file(title)) if title else None
-    if target:
-        if len(target.name) > 255:
-            raise ValueError("Название слишком длинное.")
-        if target.name == INDEX.name or (target != page and os.path.lexists(target)):
-            raise FileExistsError()
-    if old_title == title:
-        return page_key(page)
+class MoveLinks(HTMLParser):
+    """Правим адреса в тегах, сохраняя остальной HTML побайтно."""
 
+    attribute = re.compile(r"""([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
+
+    def __init__(self, source, rebase):
+        super().__init__(convert_charrefs=False)
+        self.rebase = rebase
+        self.offsets = [0, *(m.end() for m in re.finditer("\n", source))]
+        self.edits = []
+        self.feed(source)
+        self.close()
+
+    def handle_starttag(self, tag, attrs):
+        if not any(name in ("href", "src", "action") for name, _ in attrs):
+            return
+        line, column = self.getpos()
+        offset = self.offsets[line - 1] + column
+        for attr in self.attribute.finditer(self.get_starttag_text()):
+            if attr[1].lower() in ("href", "src", "action"):
+                group = attr.lastindex
+                href = html.unescape(attr[group])
+                new = self.rebase(href)
+                if new != href:
+                    value = esc(new)
+                    if group == 4:
+                        value = '"' + value + '"'
+                    self.edits.append((offset + attr.start(group), offset + attr.end(group), value))
+
+
+def move_note_links(source, path, output, page, target):
+    def rebase(href):
+        address, suffix = re.match(r"([^?#]*)(.*)", href, re.S).groups()
+        if not address or address.startswith("//") or re.match(r"^[a-z][a-z0-9+.-]*:", address, re.I):
+            return href
+        if address.startswith("/"):
+            if posixpath.normpath(unquote(address)) == "/" + page_key(page):
+                return "/" + quote(page_key(target)) + suffix
+            return href
+        absolute = Path(os.path.normpath(path.parent / unquote(address)))
+        if absolute == page:
+            absolute = target
+        elif output == path:
+            return href
+        new = relative_href(absolute, output.parent)
+        return new + ("/" if address.endswith("/") else "") + suffix
+
+    edits = MoveLinks(source, rebase).edits
+    pieces, start = [], 0
+    for left, right, value in edits:
+        pieces.extend((source[start:left], value))
+        start = right
+    revised = "".join(pieces) + source[start:]
+    tips = diagram_files(source)
+    updated = {name: rebase(href) for name, href in tips.items()}
+    return set_json(revised, "wiki-tips", updated) if updated != tips else revised
+
+
+def revise_note_links(source, meta, path, page, target, old_title, title):
     link = re.compile(r'(<a\b[^<>]*?\shref=)(["\'])([^"\'?#]+\.html)([?#][^"\']*)?\2([^>]*>)(.*?)</a>', re.S | re.I)
 
     def replace_link(match):
@@ -1449,6 +1492,58 @@ def change_note(page, title=None):
         name = old_title + ("#" + anchor if anchor else "")
         return '<span class="wl planned" data-target="%s">%s</span>' % (esc(name), label)
 
+    revised = link.sub(replace_link, source)
+    if target:
+        revised, _ = resolve_planned(revised, {old_title: target, title: target}, path.parent)
+    tips = diagram_files(revised)
+    removed_tips = {k for k, v in tips.items() if file_from_href(v, path.parent) == page_key(page)}
+    diagram_names = removed_tips | {old_title}
+    revised, names = diagram_targets(revised, dict.fromkeys(diagram_names, title or old_title))
+    new_tips = {k: v for k, v in tips.items() if k not in removed_tips}
+    if target and title in names:
+        new_tips[title] = relative_href(target, path.parent)
+    if new_tips != tips and block(revised, "script", "wiki-tips"):
+        revised = set_json(revised, "wiki-tips", new_tips)
+    if title and meta.get("parent") == old_title:
+        meta["parent"] = title
+        revised = set_json(revised, "wiki-meta", meta)
+    if path == page:
+        meta.update(title=title, updated=today())
+        meta.pop("md", None)
+        revised = set_json(revised, "wiki-meta", meta)
+        for tag in ("title", "h1"):
+            revised, count = re.subn(r"(<" + tag + r"\b[^>]*>).*?(</" + tag + r">)",
+                                     lambda m: m[1] + esc(title) + m[2], revised, count=1, flags=re.S)
+            if not count:
+                raise ValueError("В странице отсутствует заголовок.")
+        revised = re.sub(r'(<footer class="foot">)(?:источник: <a href="[^"]*\.md">.*?</a> · )?обновлено \d{4}-\d\d-\d\d',
+                         lambda m: m[1] + "обновлено " + meta["updated"], revised, count=1, flags=re.S)
+    return revised
+
+
+def change_note(page, title=None, *, folder=None):
+    """Переместить, переименовать или удалить заметку вместе с её связями и поисковым индексом."""
+    index = read(INDEX)
+    entries = get_json(index, "wiki-index")
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise ValueError("Не удалось прочитать индекс заметок.")
+    old_title = page_meta(page, read(page))["title"]
+    if not any(e.get("file") == page_key(page) and e.get("title") == old_title for e in entries):
+        raise ValueError("Индекс заметок устарел.")
+    target = page.with_name(page_file(title)) if title else None
+    if folder is not None:
+        directory = note_folder(folder.split("/") if folder else [])
+        if not directory.is_dir():
+            raise FileNotFoundError()
+        target = directory / page.name
+    if target:
+        if len(target.name) > 255:
+            raise ValueError("Название слишком длинное.")
+        if target.name == INDEX.name or (target != page and os.path.lexists(target)):
+            raise FileExistsError()
+    if old_title == title or (folder is not None and target == page):
+        return page_key(page)
+
     updates = {}
     entries = []
     paths, folders = vault_contents()
@@ -1460,35 +1555,13 @@ def change_note(page, title=None):
         if title and path != page and any(title.casefold() == n.casefold()
                                           for n in [meta["title"], *(meta.get("aliases") or [])]):
             raise FileExistsError()
-        revised = link.sub(replace_link, source)
-        if target:
-            revised, _ = resolve_planned(revised, {old_title: target, title: target}, path.parent)
-        tips = diagram_files(revised)
-        removed_tips = {k for k, v in tips.items() if file_from_href(v, path.parent) == page_key(page)}
-        diagram_names = removed_tips | {old_title}
-        revised, names = diagram_targets(revised, dict.fromkeys(diagram_names, title or old_title))
-        new_tips = {k: v for k, v in tips.items() if k not in removed_tips}
-        if target and title in names:
-            new_tips[title] = relative_href(target, path.parent)
-        if new_tips != tips and block(revised, "script", "wiki-tips"):
-            revised = set_json(revised, "wiki-tips", new_tips)
-        if title and meta.get("parent") == old_title:
-            meta["parent"] = title
-            revised = set_json(revised, "wiki-meta", meta)
-        if path == page:
-            meta.update(title=title, updated=today())
-            meta.pop("md", None)
-            revised = set_json(revised, "wiki-meta", meta)
-            for tag in ("title", "h1"):
-                revised, count = re.subn(r"(<" + tag + r"\b[^>]*>).*?(</" + tag + r">)",
-                                         lambda m: m[1] + esc(title) + m[2], revised, count=1, flags=re.S)
-                if not count:
-                    raise ValueError("В странице отсутствует заголовок.")
-            revised = re.sub(r'(<footer class="foot">)(?:источник: <a href="[^"]*\.md">.*?</a> · )?обновлено \d{4}-\d\d-\d\d',
-                             lambda m: m[1] + "обновлено " + meta["updated"], revised, count=1, flags=re.S)
         output = target if path == page else path
+        if folder is None:
+            revised = revise_note_links(source, meta, path, page, target, old_title, title)
+        else:
+            revised = move_note_links(source, path, output, page, target)
         entries.append(index_entry(output, revised))
-        if revised != source:
+        if revised != source or path != output:
             updates[output] = revised
     updates[INDEX] = update_index(index, sorted(entries, key=lambda e: e["file"]), folders)
 
@@ -1500,7 +1573,7 @@ def change_note(page, title=None):
         stage_names = {path: str(i) for i, path in enumerate(updates)}
         for path, content in updates.items():
             stage_text(page if path == target else path, staging / stage_names[path], content,
-                       keep_mtime=path not in (target, INDEX))
+                       keep_mtime=path != INDEX and (path != target or folder is not None))
             if path.exists():
                 os.link(path, backups / stage_names[path])
         published = []
@@ -1572,15 +1645,28 @@ class WikiHandler(SimpleHTTPRequestHandler):
             if not 0 < size <= 8192:
                 raise ValueError()
             data = json.loads(self.rfile.read(size).decode("utf-8"))
-            title = data.get("title") if isinstance(data, dict) else None
-            if not isinstance(title, str) or not title.strip():
+            if not isinstance(data, dict):
                 raise ValueError()
-            title = title.strip()
-            title.encode("utf-8")
-            if any(ord(c) < 32 for c in title):
-                raise ValueError()
+            if "folder" in data:
+                folder = data["folder"]
+                if not isinstance(folder, str) or "title" in data:
+                    raise ValueError()
+                folder.encode("utf-8")
+                change = {"folder": folder}
+            else:
+                title = data.get("title")
+                if not isinstance(title, str) or not title.strip():
+                    raise ValueError()
+                title = title.strip()
+                title.encode("utf-8")
+                if any(ord(c) < 32 for c in title):
+                    raise ValueError()
+                change = {"title": title}
             with wiki_write_lock():
-                filename = change_note(page, title)
+                page = self.requested_note()
+                if page is None:
+                    return
+                filename = change_note(page, **change)
         except FileExistsError:
             self.send_error(409)
             return
