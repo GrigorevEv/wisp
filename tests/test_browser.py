@@ -13,11 +13,11 @@ from tests.wiki_case import WikiCase
 
 @unittest.skipUnless(wiki.chrome_bin(), "для проверки интерфейса нужен Chrome или Chromium")
 class BrowserTest(WikiCase):
-    def index_dom(self, query, *, profile=None):
+    def index_dom(self, query, *, profile=None, base=None):
         with tempfile.TemporaryDirectory() as fresh_profile:
             result = subprocess.run([wiki.chrome_bin(), "--headless=new", "--disable-gpu",
                                      "--disable-background-networking", "--user-data-dir=" + str(profile or fresh_profile),
-                                     "--dump-dom", self.index.as_uri() + query],
+                                     "--virtual-time-budget=1500", "--dump-dom", (base or self.index.as_uri()) + query],
                                     capture_output=True, text=True, timeout=30, check=True)
         self.assertIn('data-ready="1"', result.stdout)
         return result.stdout
@@ -131,21 +131,73 @@ if (divider) {
         self.create("Встреча", "--tag", "Ёж", "--tag", "лес", section="Встречи")
         self.cli("index")
         result = self.sidebar("?q=" + quote("ЕЖ лес"))
-        self.assertEqual(re.findall(r'data-file="([^"]+)"', result), ["ezh-v-lesu.html", "atlas.html", "karty.html"])
-        self.assertIn("Найдено: 3 · во вкладке «Встречи» ещё 1", result)
+        self.assertEqual(re.findall(r'data-file="([^"]+)"', result), ["ezh-v-lesu.html", "atlas.html", "karty.html", "vstrecha.html"])
+        self.assertIn("Найдено: 4", result)
         self.assertIn("<mark>Ёж</mark>", result)
         self.assertIn('href="karty.html#%s"' % quote("ёж-в-лесу"), result)
 
-    def test_search_offers_other_tab_and_meetings_open_newest_first(self):
+    def test_global_search_and_meeting_order(self):
         self.create("2026-01-10 План", section="Встречи")
         self.create("2026-02-03 План", section="Встречи")
         self.create("Памятка")
         self.cli("index")
         result = self.sidebar("#q=" + quote("план"))
-        self.assertIn("Во вкладке «Встречи» — 2", result)
-        self.assertEqual(re.findall(r'data-file="([^"]+)"', result), [])
-        meetings = self.sidebar("#t=lectures&q=" + quote("план"))
+        self.assertIn("Найдено: 2", result)
+        self.assertEqual(re.findall(r'data-file="([^"]+)"', result), ["2026-01-10-plan.html", "2026-02-03-plan.html"])
+        meetings = self.sidebar("#t=lectures")
         self.assertEqual(re.findall(r'data-file="([^"]+)"', meetings), ["2026-02-03-plan.html", "2026-01-10-plan.html"])
+
+    def test_folders_before_notes_and_global_folder_search(self):
+        (self.html / "hardware" / "cpu").mkdir(parents=True)
+        self.create("Атлас")
+        self.cli("index")
+        listing = self.sidebar("")
+        self.assertLess(listing.index("<summary>hardware</summary>"), listing.index(">Атлас</a>"))
+        self.assertIn("<summary>cpu</summary>", listing)
+        self.assertIn("hardware/cpu", self.sidebar("#t=work&q=cpu"))
+        observe = """<script>
+document.getElementById("q").dispatchEvent(new KeyboardEvent("keydown", {key: "Enter", bubbles: true}));
+</script>"""
+        self.index.write_text(self.index.read_text().replace("</body>", observe + "</body>"))
+        listing = self.sidebar("#t=work&q=cpu")
+        self.assertIn('data-folder="hardware/cpu" open', listing)
+        self.assertIn('data-folder="hardware" open', listing)
+        self.assertIn(">Атлас</a>", listing)
+
+    def test_open_nested_result_and_follow_link_on_server(self):
+        self.create("Шина", "--folder", "hardware/Шины", "--heading", "Арбитраж", section="Железо")
+        root = self.create("Обзор")
+        root.write_text(root.read_text().replace("</h1>", '</h1><span class="wl planned" data-target="Шина#Арбитраж">Шина</span>'))
+        self.cli("links")
+        self.cli("index")
+        for query in ("арбитраж", "железо"):
+            self.assertIn('data-file="hardware/Шины/shina.html"', self.sidebar("#t=work&q=" + quote(query)))
+        address = quote("hardware/Шины/shina.html") + "#" + quote("арбитраж")
+        bookmark = "#p=" + quote(address, safe="")
+        self.assertIn('data-folder="hardware/Шины" open', self.sidebar(bookmark))
+        observe = """<script>
+window.addEventListener("load", function () {
+  var frame = document.getElementById("view");
+  if (frame.contentDocument.querySelector("h1")?.textContent === "Обзор") {
+    frame.contentDocument.querySelector("a.wl").click();
+  }
+  setTimeout(function () {
+    var h1 = frame.contentDocument.querySelector("h1");
+    if (h1) document.body.dataset.opened = h1.textContent;
+    document.body.dataset.bookmark = location.hash;
+    var selected = document.querySelector("#list a.on");
+    if (selected) selected.dispatchEvent(new MouseEvent("contextmenu", {bubbles: true}));
+    document.body.dataset.menuFile = document.getElementById("note-menu").dataset.file || "";
+  }, 200);
+});
+</script>"""
+        self.index.write_text(self.index.read_text().replace("</body>", observe + "</body>"))
+        with self.server() as base:
+            for start in ("#p=obzor.html", bookmark):
+                dom = self.index_dom(start, base=base + "/")
+                self.assertIn('data-opened="Шина"', dom)
+                self.assertIn('data-menu-file="hardware/Шины/shina.html"', dom)
+                self.assertIn(f'data-bookmark="{bookmark}"', dom)
 
     def test_render_validates_flow_and_sequence_and_writes_a_png(self):
         page = self.create("Схемы")

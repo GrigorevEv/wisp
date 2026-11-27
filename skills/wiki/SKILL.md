@@ -8,7 +8,9 @@ allowed-tools:
   - Read(~/code/personal/wisp/html/**)
   - Read(~/code/personal/wisp/_templates/**)
   - Read(~/code/personal/wisp/scripts/wiki_html.py)
+  - Edit(~/code/personal/wisp/html/**/*.html)
   - Edit(~/code/personal/wisp/html/*.html)
+  - Write(~/code/personal/wisp/html/**/*.html)
   - Write(~/code/personal/wisp/html/*.html)
   - Read(~/code/aero/scst/**)
   - Read(~/.agents/skills/wiki/**)
@@ -37,7 +39,7 @@ disable-model-invocation: true
 Пиши по-русски. В `p.sub` дай самостоятельное определение в 1–3 предложениях. После оглавления покажи конкретный пример. Новые термины объясняй при первом упоминании.
 Сомнительные факты сверяй с первоисточником, детали SCST — с кодом в `/home/ev/code/aero/scst`.
 
-- Новую страницу создай через `create "<имя>" --section "<раздел>" --summary "<первый абзац>" --heading "<заголовок>"`. Выбери раздел из `wiki-sections` на главной или «Входящие». Повтори `--heading` для каждой карточки, добавь нужные `--alias` и `--tag`, заполни карточки.
+- Новую страницу создай через `create "<имя>" --section "<раздел>" --summary "<первый абзац>" --heading "<заголовок>"`. Выбери раздел из `wiki-sections` на главной или «Входящие». Если указана папка, добавь `--folder hardware/cpu` или другой путь относительно `html/`. Повтори `--heading` для каждой карточки, добавь нужные `--alias` и `--tag`, заполни карточки.
 - При правке вступления обнови `meta[name="description"]`. При изменении разделов согласуй якоря, оглавление, навигацию и ссылки. Сохраняй авторский текст и схемы вокруг правки.
 - Ссылки и обратные ссылки оформляй как `a.wl`, будущие страницы — как `span.wl.planned[data-target]`. Добавляй их по смыслу.
 - В `references/html.md` открывай только нужный раздел, например «Большая заметка SCST», «Работа», «Схемы» или «Виджеты». Второго агента для вычитки подключай по просьбе, с `fork_turns="none"`.

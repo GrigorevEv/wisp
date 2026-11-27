@@ -10,6 +10,7 @@
 <!-- Разделы и подразделы базы. -->
 <script type="application/json" id="wiki-sections">[{"t":"Хранение данных","subs":[]},{"t":"SCST","subs":[]},{"t":"Железо","subs":[]},{"t":"Linux","subs":["Пакеты"]},{"t":"Разработка","subs":["Git","Тестирование","Безопасность"]},{"t":"Данные и распределённые системы","subs":[]},{"t":"Сеть и веб","subs":[]},{"t":"AI","subs":[]},{"t":"Менеджмент","subs":[]},{"t":"Инструменты","subs":[]},{"t":"Работа","subs":[]},{"t":"Встречи","subs":[]},{"t":"Входящие","subs":[]}]</script>
 <!-- Данные страниц. Перезаписывает `wiki_html.py index`, руками не править. -->
+<script type="application/json" id="wiki-folders">[]</script>
 <script type="application/json" id="wiki-index">[]</script>
 <style id="wiki-css">
 /* ============================================================
@@ -420,6 +421,16 @@ pre.wg-code .c { color: var(--muted); }
 #note-menu button:is(:hover, :focus-visible) { background: var(--accent-soft); }
 </style>
 <style id="wiki-sidebar-css">
+.ix-list details > summary, .ix-folder-result {
+  cursor: pointer;
+  padding: 4px 10px;
+  color: var(--text);
+  font: inherit;
+}
+.ix-list details > ul { list-style: none; margin: 0; padding-left: 16px; }
+.ix-folder-result { background: none; border: 0; text-align: left; }
+.ix-list details > summary:hover, .ix-folder-result:hover { background: var(--surface); }
+
 body.ix-app:not(.collapsed) { grid-template-columns: var(--sidebar-width, 320px) minmax(0, 1fr); }
 .ix-side { position: relative; min-width: 0; }
 .ix-tabs { flex-wrap: wrap; }
@@ -461,7 +472,7 @@ body.ix-app:not(.collapsed) { grid-template-columns: var(--sidebar-width, 320px)
       <section class="card"><h2>Как пользоваться</h2>
         <ul>
           <li>Слева — заметки по алфавиту. Заметка открывается здесь, справа.</li>
-          <li>Вкладки над списком: <b>База знаний</b> — общие заметки, <b>Работа</b> — практика по рабочим задачам, <b>Встречи</b> — заметки встреч из Spook, от новых к старым. Поиск ищет внутри открытой вкладки.</li>
+          <li>Вкладки над списком: <b>База знаний</b> — общие заметки, <b>Работа</b> — практика по рабочим задачам, <b>Встречи</b> — заметки встреч из Spook, от новых к старым. Поиск охватывает все папки, заметки и разделы.</li>
           <li>Поиск — поле над списком, клавиши <kbd>/</kbd> или <kbd>Ctrl</kbd> <kbd>K</kbd>. Ищутся все слова сразу, по началу слова; регистр и ё/е не важны. <kbd>Enter</kbd> открывает первую найденную заметку, <kbd>Esc</kbd> очищает поле.</li>
           <li>Кнопка <b>«</b> над списком сворачивает его, <b>»</b> — разворачивает.</li>
         </ul>
@@ -471,7 +482,7 @@ body.ix-app:not(.collapsed) { grid-template-columns: var(--sidebar-width, 320px)
   </div>
 </main>
 
-<script>
+<script id="wiki-navigation">
 (function () {
 "use strict";
 function $(id) { return document.getElementById(id); }
@@ -481,7 +492,12 @@ function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function 
 function norm(s) { return String(s || "").toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }
 function words(s) { var n = norm(s); return n ? n.split(" ") : []; }
 function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-function url(p, id) { return p.file.replace(/%/g, "%25").replace(/ /g, "%20").replace(/#/g, "%23").replace(/\?/g, "%3F") + (id ? "#" + encodeURIComponent(id) : ""); }
+function url(p, id) {
+  return p.file.split("/").map(encodeURIComponent).join("/") + (id ? "#" + encodeURIComponent(id) : "");
+}
+function parentFolder(path) { return path.slice(0, Math.max(0, path.lastIndexOf("/"))); }
+var folders = JSON.parse($("wiki-folders") ? $("wiki-folders").textContent : "[]");
+var expanded = new Set();
 /* Как в Obsidian: цифры, латиница, затем кириллица. */
 function cmpTitle(a, b) { return a.title.localeCompare(b.title, "en", { sensitivity: "base", numeric: true }); }
 function plural(n, a, b, c) { var m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; }
@@ -493,6 +509,7 @@ PAGES.forEach(function (p) {
   p._a = p.aliases.map(words);
   p._h = p.heads.map(function (h) { return words(h.t); });
   p._g = [].concat.apply([], p.tags.map(words));
+  p._location = words([parentFolder(p.file), p.section, p.sub].join(" "));
   p._s = words(p.summary);
   var seen = {}; p._x = words(p.text).filter(function (w) { return seen[w] ? false : (seen[w] = 1); });
 });
@@ -509,6 +526,7 @@ function score(p, qs) {
     if (!best && (m = preAny(p._a, q))) { best = W8.a * (m === 2 ? 1.5 : 1); f = "a"; }
     if (!best && (m = preAny(p._h, q))) { best = W8.h; f = "h"; }
     if (!best && (m = pre(p._g, q))) { best = W8.g; f = "g"; }
+    if (!best && (m = pre(p._location, q))) { best = W8.g; f = "location"; }
     if (!best && (m = pre(p._s, q))) { best = W8.s; f = "s"; }
     if (!best && (m = pre(p._x, q))) { best = W8.x; f = "x"; }
     if (!best) return null;
@@ -551,10 +569,11 @@ var TAB_OF_SECTION = { "Работа": "work", "Встречи": "lectures" };
 function tabOf(p) { return (p && TAB_OF_SECTION[p.section]) || "all"; }
 function inTab(p) { return tabOf(p) === tab; }
 function cmpInTab(a, b) { return tab === "lectures" ? cmpTitle(b, a) : cmpTitle(a, b); }
-function otherTabs(counts) {  /* [[ключ вкладки, сколько нашлось], …] для вкладок, кроме открытой */
-  return Object.keys(TABS).filter(function (t) { return t !== tab && counts[t]; }).map(function (t) { return [t, counts[t]]; });
-}
 function pageByFile(file) { for (var i = 0; i < PAGES.length; i++) if (PAGES[i].file === file) return PAGES[i]; return null; }
+function pageByUrl(address) {
+  if (!address) return null;
+  try { return pageByFile(decodeURIComponent(address.split("#")[0])); } catch (e) { return null; }
+}
 function setTab(t) {
   tab = TABS[t] ? t : "all";
   [].forEach.call($("tabs").querySelectorAll("[data-tab]"), function (b) {
@@ -569,35 +588,69 @@ function markCurrent() {
   var on = $("list").querySelector("a.ix-t.on");
   if (on) on.classList.remove("on");
   var a = current && $("list").querySelector('a.ix-t[data-file="' + CSS.escape(current) + '"]');
-  if (a) { a.classList.add("on"); if (!$("q").value) a.scrollIntoView({ block: "nearest" }); }
+  if (a) {
+    for (var d = a.closest("details"); d; d = d.parentElement.closest("details")) {
+      d.open = true;
+      expanded.add(d.dataset.folder);
+    }
+    a.classList.add("on"); if (!$("q").value) a.scrollIntoView({ block: "nearest" }); }
 }
+function treeRows(pages) {
+  var children = new Map(), notes = new Map();
+  function append(map, parent, value) {
+    if (!map.has(parent)) map.set(parent, []);
+    map.get(parent).push(value);
+  }
+  folders.slice().sort(function (a, b) { return a.localeCompare(b, "ru", {numeric: true}); })
+    .forEach(function (f) { append(children, parentFolder(f), f); });
+  pages.forEach(function (p) { append(notes, parentFolder(p.file), p); });
+  function rows(parent) {
+    var subfolders = (children.get(parent) || []).map(function (f) {
+      return '<li><details data-folder="' + esc(f) + '"' + (expanded.has(f) ? ' open' : '') + '><summary>' +
+        esc(f.slice(f.lastIndexOf("/") + 1)) + '</summary><ul>' + rows(f) + '</ul></details></li>';
+    });
+    var items = (notes.get(parent) || []).map(function (p) { return "<li>" + item(p) + "</li>"; });
+    return subfolders.concat(items).join("");
+  }
+  return rows("");
+}
+$("list").addEventListener("toggle", function (ev) {
+  if (ev.target.matches("details[data-folder]")) {
+    if (ev.target.open) expanded.add(ev.target.dataset.folder);
+    else expanded.delete(ev.target.dataset.folder);
+  }
+}, true);
 function renderAll() {
   var ps = PAGES.filter(inTab).sort(cmpInTab);
-  $("list").innerHTML = ps.length ? ps.map(function (p) { return "<li>" + item(p) + "</li>"; }).join("")
-    : '<li class="ix-empty">Во вкладке пока нет заметок.</li>';
+  var rows = tab === "all" ? treeRows(ps) : ps.map(function (p) { return "<li>" + item(p) + "</li>"; }).join("");
+  $("list").innerHTML = rows || '<li class="ix-empty">Во вкладке пока нет заметок.</li>';
   $("stats").textContent = ps.length + " " + plural(ps.length, "заметка", "заметки", "заметок");
-  first = $("list").querySelector("a.ix-t");
   markCurrent();
 }
 function search() {
   closeNoteMenu();
   var raw = $("q").value, qs = words(raw);
   if (!qs.length) { renderAll(); first = null; saveHash(); return; }
-  var res = [], counts = {};
-  PAGES.forEach(function (p) { var sc = score(p, qs); if (sc) { if (inTab(p)) res.push([sc, p]); else counts[tabOf(p)] = (counts[tabOf(p)] || 0) + 1; } });
-  var others = otherTabs(counts);
-  res.sort(function (x, y) { return y[0].s - x[0].s || cmpInTab(x[1], y[1]); });
-  $("stats").textContent = "Найдено: " + res.length + others.map(function (o) { return " · во вкладке «" + TABS[o[0]] + "» ещё " + o[1]; }).join("");
-  $("list").innerHTML = res.length ? res.slice(0, 80).map(function (r) {
+  var res = [];
+  PAGES.forEach(function (p) { var sc = score(p, qs); if (sc) res.push([sc, p]); });
+  var matches = folders.filter(function (f) {
+    var parts = words(f);
+    return qs.every(function (q) { return pre(parts, q); });
+  });
+  res.sort(function (x, y) { return y[0].s - x[0].s || cmpTitle(x[1], y[1]); });
+  $("stats").textContent = "Найдено: " + (res.length + matches.length);
+  var folderRows = matches.map(function (f) {
+    return '<li><button class="ix-folder-result" type="button" data-folder="' + esc(f) + '">' + marks(f, qs) + '</button></li>';
+  }).join("");
+  var noteRows = res.map(function (r) {
     var p = r[1];
     var heads = p.heads.filter(function (hd, i) { return qs.every(function (q) { return pre(p._h[i], q); }); }).slice(0, 6);
     return '<li class="res">' + item(p, marks(p.title, qs)) + '<div class="ix-snip">' + snippet(p, qs) + "</div>" +
       (heads.length ? '<ul class="ix-hd">' + heads.map(function (hd) {
         return '<li>§ <a href="' + url(p, hd.id) + '" target="view">' + marks(hd.t, qs) + "</a></li>"; }).join("") + "</ul>" : "") + "</li>";
-  }).join("") : others.length ? '<li class="ix-empty">В этой вкладке ничего не нашлось. ' + others.map(function (o) {
-      return '<button class="ix-tab" type="button" data-tab="' + o[0] + '">Во вкладке «' + TABS[o[0]] + "» — " + o[1] + "</button>"; }).join(" ") + "</li>"
-    : '<li class="ix-empty">Ничего не нашлось. Попробуйте начало слова или другое написание.</li>';
-  first = $("list").querySelector("a.ix-t");
+  }).join("");
+  $("list").innerHTML = (folderRows + noteRows) || '<li class="ix-empty">Ничего не нашлось. Попробуйте начало слова или другое написание.</li>';
+  first = $("list").querySelector("button[data-folder], a.ix-t");
   markCurrent();
   saveHash();
 }
@@ -613,7 +666,7 @@ function saveHash() {
   try { history.replaceState(null, "", location.pathname + (h.length ? "#" + h.join("&") : "")); } catch (e) {}
 }
 function showPage(file) {          /* file — как в адресе: имя-файла.html#якорь */
-  var pg = pageByFile(file.split("#")[0]);
+  var pg = pageByUrl(file);
   if (!pg) return;
   shown = file;
   current = pg.file;
@@ -625,21 +678,29 @@ function showPage(file) {          /* file — как в адресе: имя-ф
   saveHash();
 }
 function openPage(file) {
-  if (!pageByFile(file.split("#")[0])) return;
+  if (!pageByUrl(file)) return;
   view.contentWindow.location.replace(new URL(file, location.href).href);
   showPage(file);
 }
 $("list").addEventListener("click", function (ev) {
-  var b = ev.target.closest("[data-tab]");
-  if (b) { switchTab(b.getAttribute("data-tab")); return; }
+  var button = ev.target.closest("button[data-folder]");
+  if (button) {
+    var folder = button.dataset.folder;
+    for (var f = folder; f; f = parentFolder(f)) expanded.add(f);
+    $("q").value = "";
+    setTab("all");
+    search();
+    $("list").querySelector('details[data-folder="' + CSS.escape(folder) + '"] > summary').focus();
+    return;
+  }
   var a = ev.target.closest("a[target=view]");
   if (a && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && ev.button === 0) { ev.preventDefault(); openPage(a.getAttribute("href")); }
 });
 var noteMenu = $("note-menu");
 
 function showNoteMenu(ev) {
-  var row = ev.target.closest("#list > li, #recent > li");
-  var link = row && row.querySelector("a[data-file]");
+  var row = ev.target.closest("li");
+  var link = row && row.querySelector(":scope > a[data-file]");
   if (!link || !noteMenu.showPopover || $("delete-note").disabled) return;
   ev.preventDefault();
   noteMenu.dataset.file = link.dataset.file;
@@ -672,7 +733,7 @@ $("menu-rename").addEventListener("click", async function () {
   }
   $("delete-note").disabled = true;
   try {
-    var response = await fetch("/notes/" + encodeURIComponent(page.file), {
+    var response = await fetch("/notes/" + url(page), {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: title.trim() })
     });
@@ -682,7 +743,7 @@ $("menu-rename").addEventListener("click", async function () {
     }
     if (!response.ok) throw new Error();
     var result = await response.json();
-    if (current === page.file) shown = result.file + shown.slice(shown.split("#")[0].length);
+    if (current === page.file) shown = url(result) + shown.slice(shown.split("#")[0].length);
     saveHash();
     location.reload();
   } catch (err) {
@@ -707,7 +768,7 @@ async function deleteNote(page) {
   if (!confirm("Удалить заметку «" + page.title + "»?")) return;
   $("delete-note").disabled = true;
   try {
-    var response = await fetch("/notes/" + encodeURIComponent(page.file), { method: "DELETE" });
+    var response = await fetch("/notes/" + url(page), { method: "DELETE" });
     if (response.status !== 204) throw new Error();
     if (current === page.file) shown = "";
     saveHash();
@@ -728,8 +789,9 @@ window.addEventListener("message", function (ev) {
   if (m.wiki === "page" && typeof m.href === "string") {
     var href;
     try { href = new URL(m.href); } catch (e) { return; }
-    if (href.protocol === location.protocol && new URL(".", href).href === new URL(".", location.href).href) {
-      showPage(href.pathname.split("/").pop() + href.hash);
+    var root = new URL(".", location.href);
+    if (href.origin === root.origin && href.protocol === root.protocol && href.pathname.startsWith(root.pathname)) {
+      showPage(href.pathname.slice(root.pathname.length) + href.hash);
     }
   }
   else if (m.wiki === "search") focusSearch();
@@ -750,7 +812,7 @@ function focusSearch() { setCollapsed(false); $("q").focus(); $("q").select(); }
 var timer = null;
 $("q").addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(search, 60); });
 $("q").addEventListener("keydown", function (ev) {
-  if (ev.key === "Enter") { search(); if (first) openPage(first.getAttribute("href")); }
+  if (ev.key === "Enter") { search(); if (first) first.click(); }
   else if (ev.key === "Escape") { $("q").value = ""; search(); }
 });
 document.addEventListener("keydown", function (ev) {
@@ -770,7 +832,7 @@ setCollapsed(saved === "collapsed");
 var hp = new URLSearchParams(location.hash.slice(1)), q0 = new URLSearchParams(location.search).get("q");
 var savedTab = null;
 try { savedTab = localStorage.getItem("wiki-tab"); } catch (e) {}
-var p0 = hp.get("p") && pageByFile(hp.get("p").split("#")[0]);
+var p0 = pageByUrl(hp.get("p"));
 setTab(hp.get("t") || (p0 ? tabOf(p0) : savedTab));
 if (q0 || hp.get("q")) $("q").value = q0 || hp.get("q");
 search();
