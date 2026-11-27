@@ -33,6 +33,7 @@ import datetime as dt
 import html
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -204,10 +205,35 @@ def page_file(name):
     return (re.sub(r"[^a-z0-9]+", "-", s).strip("-") or "page") + ".html"
 
 
-def file_from_href(href):
-    """Файл страницы из href: «kvorum-quorum.html#раздел» → kvorum-quorum.html; не страница — None."""
-    path = unquote(href.partition("#")[0].partition("?")[0]).removeprefix("./")
-    return path if path.endswith(".html") and "/" not in path else None
+def page_key(path):
+    return path.relative_to(HTML_DIR).as_posix()
+
+
+def relative_href(target, directory):
+    return quote(Path(os.path.relpath(target, directory)).as_posix())
+
+
+def file_from_href(href, directory):
+    path = unquote(href.partition("#")[0].partition("?")[0])
+    if not path.endswith(".html") or path.startswith("/") or re.match(r"^[a-z]+:", path, re.I):
+        return None
+    return posixpath.normpath(posixpath.join(page_key(directory), path))
+
+
+def valid_folder_part(part):
+    return (bool(part) and not part.startswith((".", "_")) and "\\" not in part
+            and not Path(part).drive and all(ord(c) >= 32 for c in part))
+
+
+def note_folder(parts):
+    folder = HTML_DIR
+    for part in parts:
+        if not valid_folder_part(part):
+            raise ValueError("Недопустимая папка заметки.")
+        folder = folder / part
+        if folder.is_symlink():
+            raise ValueError("Недопустимая папка заметки.")
+    return folder
 
 
 def today():
@@ -232,7 +258,7 @@ def stage_text(path, draft, text, keep_mtime=False):
 
 
 def write_page(path, text, keep_mtime=False):
-    with tempfile.TemporaryDirectory(dir=path.parent) as tmp:
+    with tempfile.TemporaryDirectory(prefix=".wisp-", dir=path.parent) as tmp:
         draft = Path(tmp) / path.name
         stage_text(path, draft, text, keep_mtime)
         draft.replace(path)
@@ -271,11 +297,22 @@ def all_notes():
     return res
 
 
+def vault_contents():
+    files, folders = [], []
+    for root, dirs, names in os.walk(HTML_DIR):
+        parent = Path(root)
+        dirs[:] = [d for d in dirs if valid_folder_part(d) and not (parent / d).is_symlink()]
+        folders.extend(page_key(parent / d) for d in dirs)
+        for name in names:
+            path = parent / name
+            if (name.endswith(".html") and name != "index.html" and not name.startswith(("_", "."))
+                    and not path.is_symlink() and path.is_file()):
+                files.append(path)
+    return sorted(files, key=page_key), sorted(folders)
+
+
 def page_paths():
-    if not HTML_DIR.is_dir():
-        return []
-    return [p for p in sorted(HTML_DIR.glob("*.html"))
-            if p.name != "index.html" and not p.name.startswith("_") and not p.is_symlink() and p.is_file()]
+    return vault_contents()[0]
 
 
 def page_title(p):
@@ -291,8 +328,8 @@ def all_pages():
 
 
 def by_file(pages):
-    """Имя файла страницы → имя заметки."""
-    return {p.name: name for name, p in pages.items()}
+    """Путь страницы относительно html/ → имя заметки."""
+    return {page_key(p): name for name, p in pages.items()}
 
 
 def frontmatter(text):
@@ -428,7 +465,7 @@ def section_for(name, path, section=None, sub=None):
 # ---------------------------------------------------------------- md → html
 
 class Converter:
-    def __init__(self, notes):
+    def __init__(self, notes, pages=None, directory=None):
         try:
             from markdown_it import MarkdownIt
         except ModuleNotFoundError as exc:
@@ -436,6 +473,8 @@ class Converter:
                 raise
             raise ValueError("для импорта Markdown нужен пакет markdown-it-py") from exc
         self.notes = notes
+        self.pages = pages or {}
+        self.directory = directory or HTML_DIR
         self.links = []
         self.used_ids = set()
         md = MarkdownIt("commonmark", {"breaks": True, "html": True}).enable(["table", "strikethrough"])
@@ -473,8 +512,9 @@ class Converter:
         lab = re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(label, False))
         if not name:
             return '<a href="#%s">%s</a>' % (esc(head_slug(head)), lab)
-        if name in self.notes:
-            href = page_file(name) + ("#" + head_slug(head) if head else "")
+        if name in self.notes or name in self.pages:
+            page = self.pages.get(name, HTML_DIR / page_file(name))
+            href = relative_href(page, self.directory) + ("#" + head_slug(head) if head else "")
             return '<a class="wl" href="%s">%s</a>' % (esc(href), lab)
         return '<span class="wl planned" data-target="%s">%s</span>' % (esc(target), lab)
 
@@ -713,7 +753,8 @@ def favicon(meta=None):
     return '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%s">' % quote(svg, safe=" =:/,;-.()")
 
 
-def build_page(meta, h1, sub_html, intro_html, sections, summary, md_rel=None, script="", *, toc=False):
+def build_page(meta, h1, sub_html, intro_html, sections, summary, md_rel=None, script="", *, toc=False, directory=None):
+    home = relative_href(INDEX, directory or HTML_DIR)
     css, eng = template_blocks()
     crumbs = esc(meta["section"]) + (" › " + esc(meta["sub"]) if meta.get("sub") else "")
     section_links = ['<a href="#%s">%s</a>' % (esc(sid), esc(t)) for _, t, sid, _ in sections]
@@ -762,7 +803,7 @@ def build_page(meta, h1, sub_html, intro_html, sections, summary, md_rel=None, s
 </head>
 <body>
 <div class="top"><div class="top-in">
-  <a class="home" href="index.html" target="_top">База знаний</a>
+  <a class="home" href="{home}" target="_top">База знаний</a>
   {search}
   <span class="crumbs">{crumbs}</span>
   <nav>
@@ -791,16 +832,22 @@ def build_page(meta, h1, sub_html, intro_html, sections, summary, md_rel=None, s
            intro=(('<div class="intro">\n%s\n</div>\n' if sections else '<section class="card">\n%s\n</section>\n')
                   % intro_html) if intro_html else "",
            secs=secs, source=source, updated=meta["updated"], eng=eng, script=script,
-           themejs=THEME_JS, icon=favicon(jmeta), search=SEARCH_FORM)
+           themejs=THEME_JS, icon=favicon(jmeta), home=home, search=SEARCH_FORM.replace("index.html", home))
 
 
 def cmd_create(args):
     name = args.name.strip()
     if not name or not args.summary.strip() or any(not h.strip() for h in args.heading):
         raise SystemExit("укажи имя, первый абзац и заголовки разделов")
-    page = HTML_DIR / page_file(name)
-    if page == INDEX:
+    requested = Path(args.folder or ".")
+    if requested.is_absolute():
+        raise ValueError("Укажите папку относительно html/.")
+    folder = note_folder(requested.parts)
+    page = folder / page_file(name)
+    if page.name == INDEX.name:
         raise SystemExit("это имя главной страницы")
+    if name in all_pages():
+        raise SystemExit("уже есть заметка %s" % name)
     meta = {"title": name, "section": args.section, "sub": args.sub, "aliases": args.alias,
             "tags": args.tag, "term": "термин" in args.tag, "updated": today()}
     used_ids = {"содержание", "wiki-css", "wiki-engine", "wiki-meta", "wiki-tips"}
@@ -811,11 +858,11 @@ def cmd_create(args):
         sections.append((esc(heading), heading, sid, ""))
     summary = args.summary.strip()
     content = build_page(meta, esc(name), '<p class="sub">%s</p>' % esc(summary), "",
-                         sections, summary, toc=True)
-    HTML_DIR.mkdir(exist_ok=True)
+                         sections, summary, toc=True, directory=folder)
+    folder.mkdir(parents=True, exist_ok=True)
     try:
         # Публикуем полностью записанную страницу, в том числе при двух одновременных create.
-        with tempfile.TemporaryDirectory(dir=HTML_DIR) as tmp:
+        with tempfile.TemporaryDirectory(prefix=".wisp-", dir=HTML_DIR) as tmp:
             draft = Path(tmp) / page.name
             draft.write_text(content, encoding="utf-8")
             os.link(draft, page)
@@ -827,6 +874,7 @@ def cmd_create(args):
 
 def cmd_new(args):
     notes = all_notes()
+    pages = all_pages()
     order = scst_order()
     HTML_DIR.mkdir(exist_ok=True)
     rc = 0
@@ -840,11 +888,11 @@ def cmd_new(args):
             rc = 1
             continue
         name = path.stem
-        page = HTML_DIR / page_file(name)
+        page = pages.get(name, HTML_DIR / page_file(name))
         out = Path(args.out).resolve() if args.out else page
         if out == INDEX or (out.is_relative_to(VAULT) and out.suffix.lower() == ".md"):
             raise ValueError("выбери отдельный файл для HTML: %s" % out)
-        if out.exists() and out.parent == HTML_DIR and out != page and block(read(out), "script", "wiki-meta"):
+        if out.exists() and out.is_relative_to(HTML_DIR) and out != page and block(read(out), "script", "wiki-meta"):
             raise ValueError("черновик затрёт другую страницу: %s" % out.name)
         if out == page and out.exists() and not args.force:
             print("уже есть %s — не перезаписываю (--force затрёт нарисованные схемы; "
@@ -864,7 +912,7 @@ def cmd_new(args):
             continue
         text = read(path)
         fm, body = frontmatter(text)
-        conv = Converter(notes)
+        conv = Converter(notes, pages, page.parent)
         h1, chunks = split_body(body)
         intro_lines = chunks[0][1]
         rest = chunks[1:]
@@ -900,7 +948,7 @@ def cmd_new(args):
                 pm = WL_RE.search(str(par))
                 meta["parent"] = (pm.group(1).split("|")[0] if pm else str(par)).strip()
                 meta["parent_html"] = conv.restore(conv.prep_line(str(par)))
-        page = build_page(meta, esc(h1 or name), sub_html, intro_html, sections, summary, rel)
+        page = build_page(meta, esc(h1 or name), sub_html, intro_html, sections, summary, rel, directory=page.parent)
         write_page(out, page)
         todo = page.count('class="dia-todo"')
         shown = out.relative_to(PROJECT) if out.is_relative_to(PROJECT) else out
@@ -910,9 +958,14 @@ def cmd_new(args):
 
 # ---------------------------------------------------------------- sync / links / index
 
-def sync_index_sidebar(source):
+def sync_index_navigation(source):
     template = read(TEMPLATE.with_name("Индекс.html"))
-    for tag, ident, closing in (("style", "wiki-sidebar-css", "</head>"), ("script", "wiki-sidebar", "</body>")):
+    if not block(source, "script", "wiki-navigation"):
+        source = source.replace('<script>\n(function () {\n"use strict";\nfunction $(id)',
+                                '<script id="wiki-navigation">\n(function () {\n"use strict";\nfunction $(id)', 1)
+    source = source.replace("Поиск ищет внутри открытой вкладки.", "Поиск охватывает все папки, заметки и разделы.")
+    for tag, ident, closing in (("style", "wiki-sidebar-css", "</head>"),
+                                ("script", "wiki-navigation", "</body>"), ("script", "wiki-sidebar", "</body>")):
         new = block(template, tag, ident)
         if not new:
             raise ValueError("в шаблоне главной страницы нет блока %s" % ident)
@@ -934,7 +987,7 @@ def cmd_sync(args):
         s = read(p)
         t = re.sub(r'<style id="wiki-css">.*?</style>', lambda m: css, s, count=1, flags=re.S)
         if p == INDEX:
-            t = sync_index_sidebar(t)
+            t = sync_index_navigation(t)
         else:
             t = re.sub(r'<script id="wiki-engine">.*?</script>', lambda m: eng, t, count=1, flags=re.S)
         t = re.sub(r'<script>(?:try\{)?var t=\(location\.search[^\n]*?</script>', lambda m: THEME_JS, t, count=1)
@@ -948,11 +1001,14 @@ def cmd_sync(args):
             t = t.replace('<a class="home" href="index.html">', '<a class="home" href="index.html" target="_top">', 1)
             t = re.sub(r'(<span class="crumbs">)(.*?)(</span>)',
                        lambda m: m.group(1) + re.sub(r"</?a\b[^>]*>", "", m.group(2)) + m.group(3), t, count=1)
+            home = relative_href(INDEX, p.parent)
+            t = re.sub(r'(<a class="home" href=")(?:\.\./)*index\.html"', lambda m: m[1] + home + '"', t, count=1)
+            form = SEARCH_FORM.replace("index.html", home)
             if SEARCH_RE.search(t):
-                t = SEARCH_RE.sub(lambda m: SEARCH_FORM, t, count=1)
+                t = SEARCH_RE.sub(lambda m: form, t, count=1)
             else:
-                t = t.replace('<a class="home" href="index.html" target="_top">База знаний</a>\n',
-                              '<a class="home" href="index.html" target="_top">База знаний</a>\n  %s\n' % SEARCH_FORM, 1)
+                home_link = f'<a class="home" href="{home}" target="_top">База знаний</a>'
+                t = t.replace(home_link, home_link + "\n  " + form, 1)
         if t != s:
             write_page(p, t, keep_mtime=True)
             n += 1
@@ -992,7 +1048,7 @@ def diagram_files(source):
     return tips
 
 
-def resolve_planned(source, pages):
+def resolve_planned(source, pages, directory):
     opening = re.compile(r'<span class="wl planned" data-target="([^"]*)"(?: title="[^"]*")?>')
     span_tag = re.compile(r'<(/?)span\b[^>]*>', re.I)
     pieces, end, fixed = [], 0, 0
@@ -1010,7 +1066,7 @@ def resolve_planned(source, pages):
         for tag in span_tag.finditer(source, match.end()):
             depth += -1 if tag[1] else 1
             if depth == 0:
-                href = page.name + ("#" + head_slug(head) if head.strip() else "")
+                href = relative_href(page, directory) + ("#" + head_slug(head) if head.strip() else "")
                 pieces.extend((source[end:match.start()], '<a class="wl" href="%s">' % esc(href),
                                source[match.end():tag.start()], "</a>"))
                 end = tag.end()
@@ -1030,13 +1086,13 @@ def cmd_links(args):
     fixed = titles = broken = 0
     for name, p in pages.items():
         s = read(p)
-        t, count = resolve_planned(s, pages)
+        t, count = resolve_planned(s, pages, p.parent)
         fixed += count
 
         def retitle(m):
             nonlocal titles, broken
             href = html.unescape(m.group(1))
-            f = file_from_href(href)
+            f = file_from_href(href, p.parent)
             if f is None or f == "index.html":
                 return m.group(0)
             if f not in files:
@@ -1054,10 +1110,10 @@ def cmd_links(args):
         tips = {}
         for n in sorted(names):
             prior_file = prior_tips.get(n)
-            if prior_file in files:
+            if prior_file and file_from_href(prior_file, p.parent) in files:
                 tips[n] = prior_file
             elif n in pages:
-                tips[n] = pages[n].name
+                tips[n] = relative_href(pages[n], p.parent)
         if block(t, "script", "wiki-tips") and get_json(t, "wiki-tips", {}) != tips:
             t = set_json(t, "wiki-tips", tips)
         original_meta = get_json(t, "wiki-meta", {}) or {}
@@ -1130,7 +1186,7 @@ def index_entry(path, source, html_only=True):
             heads.append({"l": int(level), "id": anchor[1] if anchor else card_id, "t": label})
     mdp = VAULT / meta["md"] if not html_only and meta.get("md") else None
     return {
-        "title": meta["title"], "file": path.name, "aliases": meta.get("aliases") or [],
+        "title": meta["title"], "file": page_key(path), "aliases": meta.get("aliases") or [],
         "tags": meta.get("tags") or [], "term": bool(meta.get("term")), "section": meta.get("section") or "",
         "sub": meta.get("sub") or "", "order": meta.get("order"), "level": meta.get("level"),
         "status": meta.get("status"), "summary": description(source), "heads": heads,
@@ -1138,10 +1194,17 @@ def index_entry(path, source, html_only=True):
     }
 
 
+def update_index(source, entries, folders):
+    if not block(source, "script", "wiki-folders"):
+        source = source.replace("</head>", '<script type="application/json" id="wiki-folders">[]</script>\n</head>', 1)
+    return set_json(set_json(source, "wiki-index", entries), "wiki-folders", folders)
+
+
 def cmd_index(args):
-    data = [index_entry(path, read(path), args.html_only) for path in page_paths()]
+    paths, folders = vault_contents()
+    data = [index_entry(path, read(path), args.html_only) for path in paths]
     s = read(INDEX)
-    t = set_json(s, "wiki-index", data)
+    t = update_index(s, data, folders)
     if s != t:
         write_page(INDEX, t)
     print("индекс: %d страниц, %d КБ" % (len(data), len(t.encode("utf-8")) // 1024))
@@ -1221,13 +1284,13 @@ def cmd_check(args):
                 no_page(n)
         same = {}
         for n in sorted(notes.keys() | pages.keys()):
-            same.setdefault(page_file(n), []).append(n)
+            same.setdefault(page_key(pages[n]) if n in pages else page_file(n), []).append(n)
         for f, ns in same.items():
             if len(ns) > 1:
                 errors.append("одно имя файла html/%s у заметок: %s" % (f, ", ".join(ns)))
         seen = {}
         for p in page_paths():
-            seen.setdefault(page_title(p), []).append(p.name)
+            seen.setdefault(page_title(p), []).append(page_key(p))
         for n, fs in seen.items():
             if len(fs) > 1:
                 errors.append("у заметки «%s» несколько страниц: %s" % (n, ", ".join(fs)))
@@ -1258,7 +1321,9 @@ def cmd_check(args):
         if not here:
             continue
         try:
-            for file in set(diagram_files(s).values()) - files.keys():
+            for file in diagram_files(s).values():
+                if file_from_href(file, p.parent) in files:
+                    continue
                 errors.append("%s: схема ссылается на отсутствующий файл %s" % (name, file))
         except ValueError as exc:
             errors.append("%s: %s" % (name, exc))
@@ -1289,11 +1354,11 @@ def cmd_check(args):
             errors.append("%s: ссылка на внешний ресурс" % name)
         for href in re.findall(r'\bhref="([^"]+)"', s):
             href = html.unescape(href)
-            if re.match(r"^[a-z]+:", href) or href.startswith("#") or href.startswith("../"):
+            if re.match(r"^[a-z]+:", href) or href.startswith("#"):
                 if href.startswith("#") and len(href) > 1 and unquote(href[1:]) not in ids_of(name):
                     warns.append("%s: якорь %s не найден на странице" % (name, href))
                 continue
-            f = file_from_href(href)
+            f = file_from_href(href, p.parent)
             if f is None or f == "index.html":
                 continue
             if f not in files:
@@ -1316,7 +1381,7 @@ def cmd_check(args):
             if not only or only in own or only in clash:
                 errors.append("алиас «%s» у нескольких заметок: %s" % (k, ", ".join(sorted(own | set(clash)))))
     if index and (not only or only == "index"):
-        if get_json(index, "wiki-index") != expected_index:
+        if get_json(index, "wiki-index") != expected_index or get_json(index, "wiki-folders", []) != vault_contents()[1]:
             errors.append("данные поиска расходятся со страницами — запусти index")
     if args.render or args.screenshot:
         chrome = chrome_bin()
@@ -1329,7 +1394,7 @@ def cmd_check(args):
             with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
                 results = ex.map(lambda p: render_page(p, chrome, args.screenshot, args.height), targets)
                 for p, (dom, errs) in zip(targets, results):
-                    nm = files.get(p.name, p.stem)
+                    nm = files.get(page_key(p), p.stem)
                     errors.extend("%s: %s" % (nm, e) for e in errs)
                     if dom is None:
                         continue
@@ -1361,31 +1426,33 @@ def change_note(page, title=None):
     if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
         raise ValueError("Не удалось прочитать индекс заметок.")
     old_title = page_meta(page, read(page))["title"]
-    if not any(e.get("file") == page.name and e.get("title") == old_title for e in entries):
+    if not any(e.get("file") == page_key(page) and e.get("title") == old_title for e in entries):
         raise ValueError("Индекс заметок устарел.")
-    target = HTML_DIR / page_file(title) if title else None
+    target = page.with_name(page_file(title)) if title else None
     if target:
         if len(target.name) > 255:
             raise ValueError("Название слишком длинное.")
-        if target != page and os.path.lexists(target):
+        if target.name == INDEX.name or (target != page and os.path.lexists(target)):
             raise FileExistsError()
     if old_title == title:
-        return page.name
+        return page_key(page)
 
-    link = re.compile(r'(<a\b[^<>]*?\shref=)(["\'])(?:\./)?' + re.escape(page.name)
-                      + r'([?#][^"\']*)?\2([^>]*>)(.*?)</a>', re.S | re.I)
+    link = re.compile(r'(<a\b[^<>]*?\shref=)(["\'])([^"\'?#]+\.html)([?#][^"\']*)?\2([^>]*>)(.*?)</a>', re.S | re.I)
 
     def replace_link(match):
-        prefix, quote_char, suffix, attrs, label = match.groups()
+        prefix, quote_char, href, suffix, attrs, label = match.groups()
+        if file_from_href(html.unescape(href), path.parent) != page_key(page):
+            return match[0]
         if target:
-            return prefix + quote_char + target.name + (suffix or "") + quote_char + attrs + label + "</a>"
+            return f"{prefix}{quote_char}{relative_href(target, path.parent)}{suffix or ''}{quote_char}{attrs}{label}</a>"
         anchor = unquote(html.unescape(suffix or "").partition("#")[2])
         name = old_title + ("#" + anchor if anchor else "")
         return '<span class="wl planned" data-target="%s">%s</span>' % (esc(name), label)
 
     updates = {}
     entries = []
-    for path in page_paths():
+    paths, folders = vault_contents()
+    for path in paths:
         if path == page and not target:
             continue
         source = read(path)
@@ -1395,13 +1462,14 @@ def change_note(page, title=None):
             raise FileExistsError()
         revised = link.sub(replace_link, source)
         if target:
-            revised, _ = resolve_planned(revised, {old_title: target, title: target})
+            revised, _ = resolve_planned(revised, {old_title: target, title: target}, path.parent)
         tips = diagram_files(revised)
-        diagram_names = {k for k, v in tips.items() if v == page.name} | {old_title}
+        removed_tips = {k for k, v in tips.items() if file_from_href(v, path.parent) == page_key(page)}
+        diagram_names = removed_tips | {old_title}
         revised, names = diagram_targets(revised, dict.fromkeys(diagram_names, title or old_title))
-        new_tips = {k: v for k, v in tips.items() if v != page.name}
+        new_tips = {k: v for k, v in tips.items() if k not in removed_tips}
         if target and title in names:
-            new_tips[title] = target.name
+            new_tips[title] = relative_href(target, path.parent)
         if new_tips != tips and block(revised, "script", "wiki-tips"):
             revised = set_json(revised, "wiki-tips", new_tips)
         if title and meta.get("parent") == old_title:
@@ -1422,37 +1490,38 @@ def change_note(page, title=None):
         entries.append(index_entry(output, revised))
         if revised != source:
             updates[output] = revised
-    updates[INDEX] = set_json(index, "wiki-index", sorted(entries, key=lambda e: e["file"]))
+    updates[INDEX] = update_index(index, sorted(entries, key=lambda e: e["file"]), folders)
 
     # Сначала готовим все файлы. При ошибке публикации восстанавливаем прежние версии.
-    with tempfile.TemporaryDirectory(dir=HTML_DIR) as tmp:
+    with tempfile.TemporaryDirectory(prefix=".wisp-", dir=HTML_DIR) as tmp:
         staging = Path(tmp)
         backups = staging / "originals"
         backups.mkdir()
+        stage_names = {path: str(i) for i, path in enumerate(updates)}
         for path, content in updates.items():
-            stage_text(page if path == target else path, staging / path.name, content,
+            stage_text(page if path == target else path, staging / stage_names[path], content,
                        keep_mtime=path not in (target, INDEX))
             if path.exists():
-                os.link(path, backups / path.name)
+                os.link(path, backups / stage_names[path])
         published = []
         try:
             for path in updates:
                 if path == target and path != page:
-                    os.link(staging / path.name, path)
+                    os.link(staging / stage_names[path], path)
                 else:
-                    (staging / path.name).replace(path)
+                    (staging / stage_names[path]).replace(path)
                 published.append(path)
             if page != target:
                 page.unlink()
         except OSError:
             for path in reversed(published):
-                backup = backups / path.name
+                backup = backups / stage_names[path]
                 if backup.exists():
                     backup.replace(path)
                 else:
                     path.unlink()
             raise
-    return target.name if target else None
+    return page_key(target) if target else None
 
 
 class WikiHandler(SimpleHTTPRequestHandler):
@@ -1463,10 +1532,22 @@ class WikiHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
+    def note_path(self, url_path):
+        *folders, filename = unquote(url_path).split("/")
+        if not re.fullmatch(r"[a-z0-9-]+\.html", filename):
+            return None
+        try:
+            path = note_folder(folders) / filename
+        except ValueError:
+            return None
+        if not path.is_symlink() and path.is_file():
+            return path
+        return None
+
     def send_head(self):
-        path = self.path.split("?", 1)[0]
-        if (path != "/" and not re.fullmatch(r"/[a-z0-9-]+\.html", path)
-                or (HTML_DIR / (path.lstrip("/") or "index.html")).is_symlink()):
+        url_path = self.path.partition("?")[0].removeprefix("/")
+        page = self.note_path(url_path or "index.html")
+        if page is None:
             self.send_error(404)
             return None
         return super().send_head()
@@ -1476,12 +1557,8 @@ class WikiHandler(SimpleHTTPRequestHandler):
         if self.headers.get("Host") != host or self.headers.get("Origin") != "http://" + host:
             self.send_error(403)
             return
-        match = re.fullmatch(r"/notes/([a-z0-9-]+\.html)", self.path)
-        if not match or match[1] == "index.html":
-            self.send_error(404)
-            return
-        page = HTML_DIR / match[1]
-        if not page.is_file() or page.is_symlink():
+        page = self.note_path(self.path[len("/notes/"):]) if self.path.startswith("/notes/") else None
+        if page is None or page.name == INDEX.name:
             self.send_error(404)
             return
         return page
@@ -1556,9 +1633,10 @@ def cmd_serve(args):
 def cmd_file(args):
     """Адрес страницы заметки — для ссылки в ответе: без %-кодирования."""
     rc = 0
+    pages = all_pages()
     for arg in args.names:
         name = Path(arg).stem if arg.endswith(".md") else arg
-        page = HTML_DIR / page_file(name)
+        page = pages.get(name, HTML_DIR / page_file(name))
         if not page.exists():
             print("нет страницы: %s (html/%s)" % (name, page.name), file=sys.stderr)
             rc = 1
@@ -1576,6 +1654,7 @@ def main():
     a.add_argument("--port", type=int, default=8000)
     a = sp.add_parser("create", help="новая HTML-страница по имени")
     a.add_argument("name", help="имя заметки")
+    a.add_argument("--folder", help="папка относительно html/")
     a.add_argument("--section", required=True)
     a.add_argument("--sub", default="")
     a.add_argument("--summary", required=True, help="первый абзац обычным текстом")

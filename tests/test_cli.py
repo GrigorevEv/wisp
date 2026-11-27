@@ -11,6 +11,32 @@ class CommandTest(WikiCase):
         self.assertEqual(wiki.get_json(self.index.read_text(), "wiki-index"), [])
         self.assertIn("проверено страниц: 0, заметок: 0, ошибок: 0", self.cli("check", "--html-only"))
 
+    def test_nested_index_and_empty_folder(self):
+        (self.html / "hardware" / "cpu").mkdir(parents=True)
+        (self.html / "_draft").mkdir()
+        page = self.create("Шина")
+        page.rename(self.html / "hardware" / page.name)
+        self.cli("sync")
+        self.cli("index")
+        self.assertEqual(wiki.get_json(self.index.read_text(), "wiki-folders"), ["hardware", "hardware/cpu"])
+        self.assertEqual(wiki.get_json(self.index.read_text(), "wiki-index")[0]["file"], "hardware/shina.html")
+        first = self.index.read_bytes()
+        self.cli("index")
+        self.assertEqual(self.index.read_bytes(), first)
+        self.cli("check")
+
+    def test_folder_must_belong_to_the_database(self):
+        outside = self.root / "архив"
+        outside.mkdir()
+        (self.html / "alias").symlink_to(outside, target_is_directory=True)
+        for folder in ("alias/cpu", "../архив", str(outside), "_draft"):
+            with self.subTest(folder=folder):
+                self.cli("create", "Шина", "--folder", folder, "--section", "Железо",
+                         "--summary", "Шина", "--heading", "Пример", ok=False)
+        self.assertEqual(list(outside.iterdir()), [])
+        self.cli("index")
+        self.assertEqual(wiki.get_json(self.index.read_text(), "wiki-folders"), [])
+
     def test_create_indexes_metadata_and_links_to_each_heading(self):
         title = "Ёж & щит"
         summary = 'Сравнение «А» < «Б» & "В"'
@@ -113,6 +139,8 @@ class CommandTest(WikiCase):
         self.create("Памятка")
         self.cli("index")
         source = self.index.read_text().replace("<title>База знаний</title>", "<title>Моя база</title>")
+        source = source.replace('<script id="wiki-navigation">', '<script>').replace(
+            'function treeRows(pages)', 'function oldTreeRows(pages)')
         blocks = (("style", "wiki-sidebar-css"), ("script", "wiki-sidebar"))
         for tag, ident in blocks:
             existing = wiki.block(source, tag, ident)
@@ -124,6 +152,8 @@ class CommandTest(WikiCase):
         for tag, ident in blocks:
             self.assertIsNotNone(wiki.block(updated, tag, ident), ident)
         self.assertIn("<title>Моя база</title>", updated)
+        self.assertEqual(updated.count("function treeRows(pages)"), 1)
+        self.assertNotIn("function oldTreeRows", updated)
         for ident in ("wiki-index", "wiki-sections"):
             self.assertEqual(wiki.block(source, "script", ident)[0], wiki.block(updated, "script", ident)[0])
         self.assertIn("обновлено страниц: 0", self.cli("sync"))

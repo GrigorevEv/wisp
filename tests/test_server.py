@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -64,6 +65,38 @@ class ServerTest(WikiCase):
         self.assertEqual(wiki.get_json(child.read_text(), "wiki-meta")["parent"], "Ёж")
         entries = wiki.get_json(self.index.read_text(), "wiki-index")
         self.assertEqual({e["file"]: e["title"] for e in entries}, {page.name: "Ёж", child.name: "Потомок"})
+        self.cli("check")
+
+    def test_nested_links_survive_rename_and_delete(self):
+        folder = "hardware/Шины #1"
+        self.create("Шина", "--folder", folder)
+        target = self.html / folder / "shina.html"
+        self.assertIn('href="../../index.html"', target.read_text())
+        self.assertIn('action="../../index.html"', target.read_text())
+        self.assertIn(target.as_uri(), self.cli("file", "Шина"))
+        root = self.create("Обзор")
+        self.create("Карта", "--folder", "maps")
+        neighbor = self.html / "maps/karta.html"
+        pending = '<span class="wl planned" data-target="Шина#Пример">Шина</span>'
+        for ref in (root, neighbor):
+            ref.write_text(ref.read_text().replace("</h1>", "</h1>" + pending))
+        self.cli("links")
+        self.cli("index")
+        self.cli("check")
+        with self.server() as base:
+            old = quote(folder + "/shina.html")
+            with urlopen(base + "/" + old, timeout=5) as response:
+                self.assertEqual(response.read(), target.read_bytes())
+            self.assertEqual(self.request(base, "PATCH", old, "Index")[0], 409)
+            status, payload = self.request(base, "PATCH", old, "Контроллер")
+            self.assertEqual((status, json.loads(payload)), (200, {"file": folder + "/kontroller.html"}))
+            new = quote(folder + "/kontroller.html")
+            self.assertIn(f'href="{new}#пример"', root.read_text())
+            self.assertIn(f'href="../{new}#пример"', neighbor.read_text())
+            self.cli("check")
+            self.assertEqual(self.request(base, "DELETE", new)[0], 204)
+        self.assertIn('data-target="Контроллер#пример"', neighbor.read_text())
+        self.assertIn(folder, wiki.get_json(self.index.read_text(), "wiki-folders"))
         self.cli("check")
 
     def test_delete_refuses_stale_or_unreadable_index(self):
